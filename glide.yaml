@@ -2,3 +2,7 @@ package: github.com/dividat/driver
 import:
 - package: github.com/gorilla/websocket
   version: ^1.2.0
+- package: github.com/jteeuwen/go-bindata
+  version: ^3.0.7
+  subpackages:
+  - '...'

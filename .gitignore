@@ -1,1 +1,4 @@
 vendor/
+
+# generated assets file
+assets.go

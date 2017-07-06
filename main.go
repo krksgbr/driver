@@ -1,11 +1,16 @@
 package main
 
+//go:generate go-bindata -pkg $GOPACKAGE -o assets.go assets/...
+
 import (
 	"context"
 	"encoding/json"
 	"github.com/dividat/driver-go/senso"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 )
 
 var version = "2.0.0"
@@ -27,6 +32,19 @@ func main() {
 
 func startHTTPServer(sensoHandle *senso.Handle) {
 
+	// Load SSL keys
+	tempDir, tempDirErr := ioutil.TempDir("", "dividat-driver")
+	if tempDirErr != nil {
+		log.Panic("Could not create temp directory.")
+	}
+	defer os.RemoveAll(tempDir) // clean up
+
+	restoreAssetsErr := RestoreAssets(tempDir, "")
+	if restoreAssetsErr != nil {
+		log.Panic("Could not restore assets.")
+	}
+	sslDir := filepath.Join(tempDir, "assets", "ssl")
+
 	rootMsg, _ := json.Marshal(map[string]string{
 		"message": "Dividat Driver",
 		"version": version,
@@ -40,5 +58,5 @@ func startHTTPServer(sensoHandle *senso.Handle) {
 
 	http.HandleFunc("/senso", sensoHandle.HTTPHandler)
 
-	log.Panic(http.ListenAndServe(":8380", nil))
+	log.Panic(http.ListenAndServeTLS(":8380", filepath.Join(sslDir, "cert.pem"), filepath.Join(sslDir, "key.pem"), nil))
 }
