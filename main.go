@@ -56,7 +56,7 @@ func startHTTPServer(sensoHandle *senso.Handle) {
 		w.Write(rootMsg)
 	})
 
-	http.HandleFunc("/senso", sensoHandle.HTTPHandler)
+	http.Handle("/senso", sensoHandle)
 
 	log.Panic(http.ListenAndServeTLS(":8380", filepath.Join(sslDir, "cert.pem"), filepath.Join(sslDir, "key.pem"), nil))
 }
