@@ -4,4 +4,5 @@ deps:
 	glide install
 
 build:
-	go build -v ./cmd/dividat-driver
+	go build -v -o release/dividat-driver ./cmd/dividat-driver
+	upx release/dividat-driver

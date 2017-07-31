@@ -1,9 +1,12 @@
-# Experimental Dividat Drivers in Go
+# Dividat Drivers
+
+Dividat drivers and hardware test suites (in Go!).
 
 ## Prerequisites
 
 -   [Go](https://golang.org/)
 -   [Glide](https://glide.sh/)
+-   [UPX](https://upx.github.io/)
 
 ## Quick start
 
@@ -18,8 +21,8 @@
         glide Install
 
 -   Build and run
-        go build
-        ./driver-go
+        make
+        ./release/dividat-driver
 
 ## Notes
 

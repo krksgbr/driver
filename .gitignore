@@ -2,3 +2,5 @@ vendor/
 
 # generated go-bindata file
 server/ssl.go
+
+release/
