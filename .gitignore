@@ -1,4 +1,4 @@
 vendor/
 
-# generated assets file
-assets.go
+# generated go-bindata file
+server/ssl.go

@@ -1,6 +1,6 @@
-package main
+package server
 
-//go:generate go-bindata -pkg $GOPACKAGE -o assets.go assets/...
+//go:generate go-bindata -pkg $GOPACKAGE -o ssl.go ssl/...
 
 import (
 	"context"
@@ -15,7 +15,8 @@ import (
 
 var version = "2.0.0"
 
-func main() {
+// Start the driver server
+func Start() {
 
 	log.Printf("Dividat Driver (%s), starting up...", version)
 
@@ -24,13 +25,16 @@ func main() {
 
 	sensoHandle := senso.New(ctx)
 
+	// virtualSenso := vsenso.Default()
+	// go virtualSenso.Start(ctx)
+
 	sensoHandle.Connect("localhost")
 
-	startHTTPServer(sensoHandle)
+	httpServer(sensoHandle)
 
 }
 
-func startHTTPServer(sensoHandle *senso.Handle) {
+func httpServer(sensoHandle *senso.Handle) {
 
 	// Load SSL keys
 	tempDir, tempDirErr := ioutil.TempDir("", "dividat-driver")
@@ -43,7 +47,7 @@ func startHTTPServer(sensoHandle *senso.Handle) {
 	if restoreAssetsErr != nil {
 		log.Panic("Could not restore assets.")
 	}
-	sslDir := filepath.Join(tempDir, "assets", "ssl")
+	sslDir := filepath.Join(tempDir, "ssl")
 
 	rootMsg, _ := json.Marshal(map[string]string{
 		"message": "Dividat Driver",
