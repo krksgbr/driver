@@ -49,12 +49,14 @@ func connectTCP(ctx context.Context, address string, data chan []byte) {
 	for {
 		// attempt to open a new connection
 		dialer.Deadline = time.Now().Add(1 * time.Second)
+		log.Println("dialing", address, "...")
 		conn, connErr := dialer.DialContext(ctx, "tcp", address)
-		log.Println("Attempting connection...")
 
 		if connErr != nil {
 			log.Println(connErr.Error())
 		} else {
+
+			log.Println("connected to", address)
 
 			// Close connection if we break or return
 			defer conn.Close()
@@ -130,7 +132,6 @@ func tcpReader(conn net.Conn, channel chan<- []byte) {
 		if readErr != nil {
 			if readErr == io.EOF {
 				// connection is closed
-				log.Println("Connection closed!")
 				return
 			} else if err, ok := readErr.(net.Error); ok && err.Timeout() {
 				// Read timeout, just continue Nothing
@@ -181,7 +182,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Upgrade(w, r, w.Header(), 1024, 1024)
 	if err != nil {
 		onError(err)
-		http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
+		http.Error(w, "could not open websocket connection", http.StatusBadRequest)
 		return
 	}
 

@@ -18,17 +18,14 @@ var version = "2.0.0"
 // Start the driver server
 func Start() {
 
-	log.Printf("Dividat Driver (%s), starting up...", version)
+	log.Printf("Dividat Driver (%s)", version)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	sensoHandle := senso.New(ctx)
 
-	// virtualSenso := vsenso.Default()
-	// go virtualSenso.Start(ctx)
-
-	sensoHandle.Connect("localhost")
+	sensoHandle.Connect("127.0.0.1")
 
 	httpServer(sensoHandle)
 
