@@ -3,26 +3,32 @@ package senso
 import (
 	"context"
 	"errors"
-	"github.com/gorilla/websocket"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 )
 
 // Handle for managing Senso
 type Handle struct {
 	Data    chan []byte
 	Control chan []byte
-	ctx     context.Context
+
+	ctx context.Context
+
+	log *logrus.Entry
 }
 
 // New returns an initialized Senso handler
-func New(ctx context.Context) *Handle {
+func New(ctx context.Context, log *logrus.Entry) *Handle {
 	handle := Handle{}
 
 	handle.ctx = ctx
+
+	handle.log = log
 
 	// Make channels
 	handle.Data = make(chan []byte)
@@ -36,37 +42,44 @@ func (handle *Handle) Connect(address string) context.CancelFunc {
 	// Create a child context for a new connection. This allows an individual connection (attempt) to be cancelled without restarting the whole Senso handler
 	ctx, cancel := context.WithCancel(handle.ctx)
 
-	go connectTCP(ctx, address+":55568", handle.Data)
-	go connectTCP(ctx, address+":55567", handle.Control)
+	handle.log.WithField("address", address).Info("attempting to connect")
+
+	go connectTCP(ctx, handle.log.WithField("channel", "data"), address+":55568", handle.Data)
+	go connectTCP(ctx, handle.log.WithField("channel", "control"), address+":55567", handle.Control)
 
 	return cancel
 }
 
-func connectTCP(ctx context.Context, address string, data chan []byte) {
+// connectTCP creates a persistent tcp connection to address
+func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, data chan []byte) {
 	var dialer net.Dialer
+
+	var log = baseLogger.WithField("address", address)
 
 	// loop to retry connection
 	for {
 		// attempt to open a new connection
 		dialer.Deadline = time.Now().Add(1 * time.Second)
-		log.Println("dialing", address, "...")
+		log.Info("dialing")
 		conn, connErr := dialer.DialContext(ctx, "tcp", address)
 
 		if connErr != nil {
 			log.Println(connErr.Error())
+			log.WithError(connErr).Info("dial failed")
 		} else {
 
-			log.Println("connected to", address)
+			log.Info("connected")
 
 			// Close connection if we break or return
 			defer conn.Close()
 
 			// create channel for reading data and go read
 			readChannel := make(chan []byte)
-			go tcpReader(conn, readChannel)
+			go tcpReader(log, conn, readChannel)
 
 			// create channel for writing data
 			writeChannel := make(chan []byte)
+			// We need an additional channel for handling write errors, unlike the readChannel we don't want to close the channel as somebody might try to write to it
 			writeErrors := make(chan error)
 			defer close(writeChannel)
 			go tcpWriter(conn, writeChannel, writeErrors)
@@ -96,8 +109,9 @@ func connectTCP(ctx context.Context, address string, data chan []byte) {
 
 				case writeError := <-writeErrors:
 					if err, ok := writeError.(net.Error); ok && err.Timeout() {
-						onError(err)
+						log.Debug("timeout")
 					} else {
+						log.WithError(writeError).Error("write error")
 						close(writeChannel)
 						break DataLoop
 					}
@@ -118,7 +132,7 @@ func connectTCP(ctx context.Context, address string, data chan []byte) {
 }
 
 // Helper to read from TCP connection
-func tcpReader(conn net.Conn, channel chan<- []byte) {
+func tcpReader(log *logrus.Entry, conn net.Conn, channel chan<- []byte) {
 
 	defer close(channel)
 
@@ -132,11 +146,12 @@ func tcpReader(conn net.Conn, channel chan<- []byte) {
 		if readErr != nil {
 			if readErr == io.EOF {
 				// connection is closed
+				log.Info("connection closed")
 				return
 			} else if err, ok := readErr.(net.Error); ok && err.Timeout() {
 				// Read timeout, just continue Nothing
 			} else {
-				log.Println(readErr.Error())
+				log.WithError(readErr).Error("read error")
 				return
 			}
 		} else {
@@ -172,52 +187,67 @@ func tcpWriter(conn net.Conn, channel <-chan []byte, errorChannel chan<- error) 
 	}
 }
 
-// How to deal with errors
-func onError(err error) {
-	log.Println(err)
+// Implement net/http Handler interface
+var webSocketUpgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
-// Implement net/http Handler interface
 func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	conn, err := websocket.Upgrade(w, r, w.Header(), 1024, 1024)
+
+	var log = handle.log.WithFields(logrus.Fields{
+		"address":   r.RemoteAddr,
+		"userAgent": r.UserAgent(),
+	})
+
+	// Update to WebSocket
+	conn, err := webSocketUpgrader.Upgrade(w, r, nil)
 	if err != nil {
-		onError(err)
-		http.Error(w, "could not open websocket connection", http.StatusBadRequest)
+		log.WithError(err).Error("websocket upgrade error")
+		http.Error(w, "WebSocket upgrade error", http.StatusBadRequest)
 		return
 	}
+
+	log.Info("WebSocket connection opened")
 
 	// send data
 	go func() {
 		for data := range handle.Data {
 			// fmt.Println(data)
 			conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
+			defer conn.Close()
 			err := conn.WriteMessage(websocket.BinaryMessage, data)
 			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-					onError(err)
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+					log.WithError(err).Error("WebSocket error")
 				}
-				break
+				return
 			}
 		}
 	}()
 
 	// receive messages
 	go func() {
+		defer conn.Close()
 		for {
 			messageType, b, err := conn.ReadMessage()
 			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-					onError(err)
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+					log.WithError(err).Error("WebSocket error")
 				}
-				break
+				return
+			}
+
+			if messageType == websocket.BinaryMessage {
+				handle.Control <- b
 			} else {
-				if messageType == websocket.BinaryMessage {
-					handle.Control <- b
-				}
+				log.Debug("Got a non binary message! TODO: handle it")
 			}
 
 		}
-
 	}()
 
 }
