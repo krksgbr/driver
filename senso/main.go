@@ -64,7 +64,6 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 		conn, connErr := dialer.DialContext(ctx, "tcp", address)
 
 		if connErr != nil {
-			log.Println(connErr.Error())
 			log.WithError(connErr).Info("dial failed")
 		} else {
 

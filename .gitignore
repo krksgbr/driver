@@ -1,4 +1,5 @@
 vendor/
+node_modules/
 
 # generated go-bindata file
 server/ssl.go

@@ -12,7 +12,7 @@ import (
 
 	"github.com/dividat/driver-go/senso"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var version = "2.0.0"
@@ -22,47 +22,49 @@ const serverPort = "8382"
 // Start the driver server
 func Start() {
 
-	log.WithField("version", version).Info("Dividat Driver starting")
+	// Set up logging
+	logServer := NewLogServer()
+	logrus.AddHook(logServer)
+	http.Handle("/log", logServer)
 
+	logrus.WithField("version", version).Info("Dividat Driver starting")
+
+	// Setup a context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sensoHandle := senso.New(ctx, log.WithField("package", "senso"))
-
+	// Setup Senso
+	sensoHandle := senso.New(ctx, logrus.WithField("package", "senso"))
 	sensoHandle.Connect("127.0.0.1")
+	http.Handle("/senso", sensoHandle)
 
-	httpServer(log.WithField("package", "server"), sensoHandle)
+	// Create a logger for server
+	log := logrus.WithField("package", "server")
 
-}
-
-func httpServer(log *log.Entry, sensoHandle *senso.Handle) {
-
-	// Load SSL keys
+	// Unpack ssl keys
 	tempDir, tempDirErr := ioutil.TempDir("", "dividat-driver")
 	if tempDirErr != nil {
 		log.Panic("could not create temp directory")
 	}
 	defer os.RemoveAll(tempDir) // clean up
-
 	restoreAssetsErr := RestoreAssets(tempDir, "")
 	if restoreAssetsErr != nil {
 		log.Panic("could not restore ssl keys")
 	}
 	sslDir := filepath.Join(tempDir, "ssl")
 
+	// Server root
 	rootMsg, _ := json.Marshal(map[string]string{
 		"message": "Dividat Driver",
 		"version": version,
 	})
-
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		w.Write(rootMsg)
 	})
 
-	http.Handle("/senso", sensoHandle)
-
+	// Start the server
 	log.WithField("port", serverPort).Info("starting http server")
 	log.Panic(http.ListenAndServeTLS(":"+serverPort, filepath.Join(sslDir, "cert.pem"), filepath.Join(sslDir, "key.pem"), nil))
 }
