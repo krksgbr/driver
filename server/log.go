@@ -17,6 +17,7 @@ type LogServer struct {
 func NewLogServer() *LogServer {
 	logServer := LogServer{}
 
+	// TODO: Currently once the channel is full, new log entries are discarded. The opposite behaviour is far more desirable: old log entries are discarded
 	logServer.channel = make(chan *logrus.Entry, 20)
 
 	return &logServer
