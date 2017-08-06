@@ -15,6 +15,8 @@ type Handle struct {
 	Data    chan []byte
 	Control chan []byte
 
+	RemoteAddress string
+
 	ctx context.Context
 
 	cancelCurrentConnection context.CancelFunc
@@ -39,10 +41,17 @@ func New(ctx context.Context, log *logrus.Entry) *Handle {
 
 // Connect to a Senso, will create TCP connections to control and data ports
 func (handle *Handle) Connect(address string) {
+
+	// disconnect current connection first
+	handle.Disconnect()
+
+	// set address in handle
+	handle.RemoteAddress = address
+
 	// Create a child context for a new connection. This allows an individual connection (attempt) to be cancelled without restarting the whole Senso handler
 	ctx, cancel := context.WithCancel(handle.ctx)
 
-	handle.log.WithField("address", address).Info("attempting to connect")
+	handle.log.WithField("address", address).Info("attempting to connect with Senso")
 
 	go connectTCP(ctx, handle.log.WithField("channel", "data"), address+":55568", handle.Data)
 	go connectTCP(ctx, handle.log.WithField("channel", "control"), address+":55567", handle.Control)
@@ -53,9 +62,13 @@ func (handle *Handle) Connect(address string) {
 // Disconnect from current connection
 func (handle *Handle) Disconnect() {
 	if handle.cancelCurrentConnection != nil {
+		handle.log.Info("disconnecting from Senso")
 		handle.cancelCurrentConnection()
+		handle.RemoteAddress = ""
 	}
 }
+
+// TCP connection helpers
 
 // connectTCP creates a persistent tcp connection to address
 func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, data chan []byte) {

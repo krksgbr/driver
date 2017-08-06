@@ -55,18 +55,8 @@ type Message struct {
 
 // SensoConnection describes where we are connected to
 type SensoConnection struct {
-	IP string `json:"IP"`
-}
-
-// MarshalJSON encodes SensoConnection to JSON
-func (sensoConnection *SensoConnection) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&struct {
-		Type    string `json:"type"`
-		Address string `json:"address"`
-	}{
-		Type:    "IP",
-		Address: sensoConnection.IP,
-	})
+	Type    string `json:"type"`
+	Address string `json:"address"`
 }
 
 // MarshalJSON implementes encoding/json Marshaler interface for Message
@@ -152,7 +142,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if command.GetSensoConnection != nil {
 					var message Message
 
-					message.SensoConnection = &SensoConnection{IP: "127.0.0.1"}
+					message.SensoConnection = &SensoConnection{Type: "IP", Address: handle.RemoteAddress}
 
 					// encoded, encodeErr := message.MarshallJSON()
 					encoded, encodeErr := json.Marshal(&message)
@@ -169,9 +159,13 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					}
 
 				} else if command.SensoConnect != nil {
-					// TODO implement this!
-					log.Warn("SensoConnect command not yet implemented!")
-					handle.Disconnect()
+					connectionType := command.SensoConnect.SensoConnection.Type
+					if connectionType == "IP" {
+						handle.Connect(command.SensoConnect.SensoConnection.Address)
+					} else {
+						// TODO: think about if this should cause a warning
+						log.Warn("do not know how to handle connection type " + connectionType)
+					}
 				}
 
 			}
