@@ -23,6 +23,7 @@ const serverPort = "8382"
 func Start() {
 
 	// Set up logging
+	logrus.SetLevel(logrus.DebugLevel)
 	logServer := NewLogServer()
 	logrus.AddHook(logServer)
 	http.Handle("/log", logServer)

@@ -5,10 +5,8 @@ import (
 	"errors"
 	"io"
 	"net"
-	"net/http"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,6 +16,8 @@ type Handle struct {
 	Control chan []byte
 
 	ctx context.Context
+
+	cancelCurrentConnection context.CancelFunc
 
 	log *logrus.Entry
 }
@@ -38,7 +38,7 @@ func New(ctx context.Context, log *logrus.Entry) *Handle {
 }
 
 // Connect to a Senso, will create TCP connections to control and data ports
-func (handle *Handle) Connect(address string) context.CancelFunc {
+func (handle *Handle) Connect(address string) {
 	// Create a child context for a new connection. This allows an individual connection (attempt) to be cancelled without restarting the whole Senso handler
 	ctx, cancel := context.WithCancel(handle.ctx)
 
@@ -47,7 +47,14 @@ func (handle *Handle) Connect(address string) context.CancelFunc {
 	go connectTCP(ctx, handle.log.WithField("channel", "data"), address+":55568", handle.Data)
 	go connectTCP(ctx, handle.log.WithField("channel", "control"), address+":55567", handle.Control)
 
-	return cancel
+	handle.cancelCurrentConnection = cancel
+}
+
+// Disconnect from current connection
+func (handle *Handle) Disconnect() {
+	if handle.cancelCurrentConnection != nil {
+		handle.cancelCurrentConnection()
+	}
 }
 
 // connectTCP creates a persistent tcp connection to address
@@ -184,69 +191,4 @@ func tcpWriter(conn net.Conn, channel <-chan []byte, errorChannel chan<- error) 
 		}
 
 	}
-}
-
-// Implement net/http Handler interface
-var webSocketUpgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
-
-func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
-	var log = handle.log.WithFields(logrus.Fields{
-		"address":   r.RemoteAddr,
-		"userAgent": r.UserAgent(),
-	})
-
-	// Update to WebSocket
-	conn, err := webSocketUpgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.WithError(err).Error("websocket upgrade error")
-		http.Error(w, "WebSocket upgrade error", http.StatusBadRequest)
-		return
-	}
-
-	log.Info("WebSocket connection opened")
-
-	// send data
-	go func() {
-		for data := range handle.Data {
-			// fmt.Println(data)
-			conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
-			defer conn.Close()
-			err := conn.WriteMessage(websocket.BinaryMessage, data)
-			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
-					log.WithError(err).Error("WebSocket error")
-				}
-				return
-			}
-		}
-	}()
-
-	// receive messages
-	go func() {
-		defer conn.Close()
-		for {
-			messageType, b, err := conn.ReadMessage()
-			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
-					log.WithError(err).Error("WebSocket error")
-				}
-				return
-			}
-
-			if messageType == websocket.BinaryMessage {
-				handle.Control <- b
-			} else {
-				log.Debug("Got a non binary message! TODO: handle it")
-			}
-
-		}
-	}()
-
 }
