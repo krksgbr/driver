@@ -24,6 +24,10 @@ Dividat drivers and hardware test suites (in Go!).
         make
         ./release/dividat-driver
 
+    Or use `go run`:
+
+        go run cmd/dividat-driver/main.go start
+
 ## Notes
 
 -   Requires a special build of `diviapps`
