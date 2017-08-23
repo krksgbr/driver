@@ -1,6 +1,7 @@
 package server
 
 import (
+	"container/list"
 	"fmt"
 	"net/http"
 
@@ -11,14 +12,37 @@ import (
 // LogServer implements logrus.Hook and http.Handler interfaces
 type LogServer struct {
 	channel chan *logrus.Entry
+	entries *list.List
+
+	listeners *list.List
 }
 
 // NewLogServer returns a new LogServer
 func NewLogServer() *LogServer {
 	logServer := LogServer{}
 
-	// TODO: Currently once the channel is full, new log entries are discarded. The opposite behaviour is far more desirable: old log entries are discarded
-	logServer.channel = make(chan *logrus.Entry, 20)
+	logServer.channel = make(chan *logrus.Entry, 5)
+	logServer.entries = list.New()
+
+	logServer.listeners = list.New()
+
+	// start a goroutine handling incoming log entries
+	go func() {
+		for entry := range logServer.channel {
+			// add to log
+			logServer.entries.PushFront(entry)
+
+			for listenerElement := logServer.listeners.Front(); listenerElement != nil; listenerElement = listenerElement.Next() {
+				listener, ok := listenerElement.Value.(chan *logrus.Entry)
+
+				if !ok {
+					continue
+				}
+
+				listener <- entry
+			}
+		}
+	}()
 
 	return &logServer
 }
@@ -34,7 +58,8 @@ func (logServer *LogServer) Fire(entry *logrus.Entry) error {
 	select {
 	case logServer.channel <- entry:
 	default:
-		fmt.Println("Could not send logentry")
+		fmt.Println("ERROR[LogServer]: Could not handle log entry.")
+		fmt.Println(entry.String())
 	}
 	return nil
 }
@@ -59,7 +84,12 @@ func (logServer *LogServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for entry := range logServer.channel {
+	// Set up as listener so live log entries are received here and forwarded via WebSocket
+	entries := make(chan *logrus.Entry)
+	listenerElement := logServer.listeners.PushFront(entries)
+	defer logServer.listeners.Remove(listenerElement)
+
+	for entry := range entries {
 
 		encoded, encodeErr := jsonFormatter.Format(entry)
 		if encodeErr != nil {

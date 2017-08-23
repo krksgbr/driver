@@ -36,7 +36,7 @@ func Start() {
 
 	// Setup Senso
 	sensoHandle := senso.New(ctx, logrus.WithField("package", "senso"))
-	sensoHandle.Connect("127.0.0.1")
+	// sensoHandle.Connect("127.0.0.1")
 	http.Handle("/senso", sensoHandle)
 
 	// Create a logger for server
