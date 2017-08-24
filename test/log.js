@@ -11,6 +11,10 @@ function connect () {
     setTimeout(connect, 1000)
   }
 
+  ws.on('open', () => {
+    console.log('Connection opened!')
+  })
+
   ws.onerror = (e) => {
     ws.close()
   }
