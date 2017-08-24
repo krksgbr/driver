@@ -42,6 +42,9 @@ func Start() {
 	// Create a logger for server
 	log := logrus.WithField("package", "server")
 
+	// Start the monitor
+	go startMonitor(logrus.WithField("package", "monitor"))
+
 	// Unpack ssl keys
 	tempDir, tempDirErr := ioutil.TempDir("", "dividat-driver")
 	if tempDirErr != nil {

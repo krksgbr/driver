@@ -1,16 +1,14 @@
 /* eslint-env mocha */
 
-const { spawn } = require('child_process')
-const { wait } = require('./utils')
+const { wait, connectWithLog, startDriver } = require('./utils')
 const rp = require('request-promise')
 const expect = require('chai').expect
-const WebSocket = require('ws')
 
 var driver
 
 beforeEach(async () => {
   var code = 0
-  driver = spawn('release/dividat-driver', ['start']).on('exit', (c) => {
+  driver = startDriver().on('exit', (c) => {
     code = c
   })
   await wait(500)
@@ -32,17 +30,26 @@ it('Get message and version with HTTP get.', async () => {
 
 it('Opening a second instance of the driver fails.', (done) => {
   // the beforeEach hook already started the first running instance for us
-  spawn('release/dividat-driver', ['start']).on('exit', (c) => {
+  startDriver().on('exit', (c) => {
     expect(c).to.be.equal(2)
     done()
   })
 })
 
-it('Connect to log WebSocket endpoint.', (done) => {
-  new WebSocket('wss://localhost.dividat.com:8382/log')
+it('Connect to log WebSocket endpoint and receive log entry.', (done) => {
+  connectWithLog()
     .on('error', () => {
     })
     .on('open', () => {
-      done()
+      // Cause a log entry
+      // TODO: check if this works on windows. SIGHUP is a POSIX signal and might not be implemented on Windows.
+      driver.kill('SIGHUP')
+    }).on('message', (s) => {
+      var msg = JSON.parse(s)
+      if (msg.package === 'monitor') {
+        expect(msg).to.have.property('routines')
+        expect(msg).to.have.property('sysMem')
+        done()
+      }
     })
 })

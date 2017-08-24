@@ -1,6 +1,6 @@
 /* eslint-env mocha */
 describe('Build process', () => {
-  // require('./build')
+  require('./build')
 })
 
 describe('General functionality', () => {
