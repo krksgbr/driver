@@ -6,3 +6,7 @@ describe('Build process', () => {
 describe('General functionality', () => {
   require('./general')
 })
+
+describe('Senso', () => {
+  require('./senso')
+})

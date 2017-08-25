@@ -1,5 +1,6 @@
 const WebSocket = require('ws')
 const { spawn } = require('child_process')
+const Promise = require('bluebird')
 
 module.exports = {
   wait: function (t) {
@@ -9,10 +10,32 @@ module.exports = {
   },
 
   startDriver: function () {
+    // return spawn('release/dividat-driver', ['start'], {stdio: 'inherit'})
     return spawn('release/dividat-driver', ['start'])
   },
 
   connectWithLog: function () {
-    return new WebSocket('wss://localhost.dividat.com:8382/log')
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket('wss://localhost.dividat.com:8382/log')
+      ws.on('open', () => {
+        ws.removeAllListeners()
+        resolve(ws)
+      }).on('error', reject)
+    })
+  },
+
+  expectEvent: function (emitter, event, filter) {
+    return new Promise((resolve, reject) => {
+      // TODO: remove listener once resolved
+      emitter.on(event, (a) => {
+        try {
+          if (filter(a)) {
+            resolve(a)
+          }
+        } catch (e) {
+          //
+        }
+      })
+    })
   }
 }

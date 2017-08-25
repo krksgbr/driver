@@ -1,0 +1,149 @@
+/* eslint-env mocha */
+const { wait, connectWithLog, startDriver, expectEvent } = require('../utils')
+const expect = require('chai').expect
+const WebSocket = require('ws')
+const Promise = require('bluebird')
+
+const mock = require('./mock')
+// HELPERS
+
+// Connect to the Senso WS endpoint
+function connectSensoWS () {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket('wss://localhost.dividat.com:8382/senso')
+    ws.on('open', () => {
+      ws.removeAllListeners()
+      resolve(ws)
+    }).on('error', reject)
+  })
+}
+
+// Returns a promise that is resolved with a new connection to a server
+function getConnection (server) {
+  return new Promise((resolve, reject) => {
+    server.on('connection', (c) => resolve(c))
+          .on('error', (e) => reject(e))
+  })
+}
+
+// TESTS
+
+describe('Basic functionality', () => {
+  var driver
+  var senso = {}
+  var log
+
+  beforeEach(async () => {
+  // Start driver
+    var code = 0
+    driver = startDriver().on('exit', (c) => {
+      code = c
+    })
+  // Give driver 500ms to start up
+    await wait(500)
+    expect(code).to.be.equal(0)
+    driver.removeAllListeners()
+
+  // connect to log
+    log = await connectWithLog()
+
+  // start a mock Senso
+    senso.data = mock.dataChannel()
+    senso.control = mock.controlChannel()
+  })
+
+  afterEach(() => {
+    driver.kill()
+
+    senso.data.close()
+    senso.control.close()
+  })
+
+// Sends a command to Driver (over WS) to connect with the mock senso
+  function connectWithMockSenso (ws) {
+    const cmd = JSON.stringify({
+      type: 'SensoConnect',
+      connection: {type: 'IP', address: '127.0.0.1'}
+    })
+
+    ws.send(cmd)
+
+    return expectEvent(log, 'message', (s) => {
+      const entry = JSON.parse(s)
+      expect(entry.package).to.be.equal('senso')
+      expect(entry.channel).to.be.equal('data')
+      expect(entry.msg).to.be.equal('connected')
+      return true
+    }).then(() => {
+      return ws
+    })
+  }
+  it('Can connect to Senso WebSocket endpoint.', async () => {
+    const log = await connectWithLog()
+
+    const receiveLogEntry = new Promise((resolve, reject) => {
+      log.on('message', (s) => {
+        const entry = JSON.parse(s)
+        if (entry.package === 'senso') {
+          expect(entry.msg).to.be.equal('WebSocket connection opened')
+          resolve()
+        }
+      }).on('error', reject)
+    })
+
+    await connectSensoWS()
+
+    return receiveLogEntry
+  })
+
+  it('Can connect to a mock Senso.', async function () {
+  // disable mocha timeout
+    this.timeout(0)
+
+    const controlConnection = getConnection(senso.control).timeout(500)
+    const dataConnection = getConnection(senso.data).timeout(500)
+
+    await connectSensoWS()
+    .then(connectWithMockSenso)
+
+    await Promise.all([controlConnection, dataConnection])
+  })
+
+  it('Can get connection status', async function () {
+    this.timeout(0)
+
+    const sensoWS = await connectSensoWS()
+    .then((ws) => {
+      const cmd = JSON.stringify({
+        type: 'GetSensoConnection'
+      })
+      ws.send(cmd)
+      return ws
+    })
+
+    return expectEvent(sensoWS, 'message', (s) => {
+      const msg = JSON.parse(s)
+      expect(msg.type).to.be.equal('SensoConnection')
+      return true
+    })
+  })
+
+  it('Data is forwarded from Senso data channel to WS.', async function () {
+    const sensoWS = await connectSensoWS().then(connectWithMockSenso)
+
+    const buffer = Buffer.from(new ArrayBuffer(10))
+
+    const readBuffer = expectEvent(sensoWS, 'message', (incoming) => {
+      return (buffer.compare(incoming) === 0)
+    })
+
+    senso.data.stream.write(buffer)
+
+    return readBuffer
+  })
+})
+
+
+describe('Remain in steady state', () => {
+
+})
