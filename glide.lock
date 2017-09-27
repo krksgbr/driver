@@ -1,5 +1,5 @@
-hash: 623bb653de7c237f90f3db9af2d5e9d709542f11c6849f4c20c94c4917cf15c8
-updated: 2017-08-02T13:50:40.068735618+02:00
+hash: 18c353fa3f3b0f15c6699c8c8a4c0cd177fa3788d89b66e81b3c08cbfa871cf6
+updated: 2017-09-28T00:40:08.211203654+02:00
 imports:
 - name: github.com/gorilla/websocket
   version: ea4d1f681babbce9545c9c5f3d5194a789c89f5b
@@ -9,6 +9,4 @@ imports:
   - '...'
 - name: github.com/sirupsen/logrus
   version: a3f95b5c423586578a4e099b11a46c2479628cac
-- name: github.com/urfave/cli
-  version: 0bdeddeeb0f650497d603c4ad7b20cfe685682f6
 testImports: []

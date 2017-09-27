@@ -10,8 +10,7 @@ module.exports = {
   },
 
   startDriver: function () {
-    // return spawn('release/dividat-driver', ['start'], {stdio: 'inherit'})
-    return spawn('release/dividat-driver', ['start'])
+    return spawn('release/dividat-driver')
   },
 
   connectWithLog: function () {
