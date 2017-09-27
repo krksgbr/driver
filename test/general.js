@@ -21,7 +21,7 @@ afterEach(() => {
 })
 
 it('Get message and version with HTTP get.', async () => {
-  return rp({uri: 'https://localhost.dividat.com:8382/', json: true})
+  return rp({uri: 'http://127.0.0.1:8382/', json: true})
   .then((response) => {
     expect(response).to.have.property('message').equal('Dividat Driver')
     expect(response).to.have.property('version')

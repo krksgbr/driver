@@ -10,7 +10,7 @@ const mock = require('./mock')
 // Connect to the Senso WS endpoint
 function connectSensoWS () {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket('wss://localhost.dividat.com:8382/senso')
+    const ws = new WebSocket('ws://127.0.0.1:8382/senso')
     ws.on('open', () => {
       ws.removeAllListeners()
       resolve(ws)
@@ -141,9 +141,4 @@ describe('Basic functionality', () => {
 
     return readBuffer
   })
-})
-
-
-describe('Remain in steady state', () => {
-
 })
