@@ -10,6 +10,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// TODO: implement a backoff strategy
+const dialTimeout = 1 * time.Second
+const retryTimeout = 5 * time.Second
+
 // connectTCP creates a persistent tcp connection to address
 func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, data chan []byte) {
 	var dialer net.Dialer
@@ -19,7 +23,7 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 	// loop to retry connection
 	for {
 		// attempt to open a new connection
-		dialer.Deadline = time.Now().Add(1 * time.Second)
+		dialer.Deadline = time.Now().Add(dialTimeout)
 		log.Info("dialing")
 		conn, connErr := dialer.DialContext(ctx, "tcp", address)
 
@@ -84,7 +88,7 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 			return
 		default:
 			// Sleep 5s before reattempting to reconnect
-			time.Sleep(5 * time.Second)
+			time.Sleep(retryTimeout)
 		}
 
 	}
