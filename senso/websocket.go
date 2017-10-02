@@ -1,12 +1,15 @@
 package senso
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/grandcat/zeroconf"
 	"github.com/sirupsen/logrus"
 )
 
@@ -14,20 +17,34 @@ import (
 
 // Command sent by Play
 type Command struct {
-	*GetSensoConnection
-	*SensoConnect
+	*GetStatus
+
+	*Connect
+	*Disconnect
+
+	*Discover
 }
 
-// GetSensoConnection command
-type GetSensoConnection struct{}
+// GetStatus command
+type GetStatus struct{}
 
-// SensoConnect command
-type SensoConnect struct {
-	SensoConnection SensoConnection `json:"connection"`
+// Connect command
+type Connect struct {
+	Address string `json:"address"`
+}
+
+// Disconnect command
+type Disconnect struct{}
+
+// Discover command
+type Discover struct {
+	Duration int `json:"duration"`
 }
 
 // UnmarshalJSON implements encoding/json Unmarshaler interface
 func (command *Command) UnmarshalJSON(data []byte) error {
+
+	// Helper struct to get type
 	temp := struct {
 		Type string `json:"type"`
 	}{}
@@ -35,39 +52,64 @@ func (command *Command) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if temp.Type == "GetSensoConnection" {
-		command.GetSensoConnection = &GetSensoConnection{}
-	} else if temp.Type == "SensoConnect" {
-		err := json.Unmarshal(data, &command.SensoConnect)
+	if temp.Type == "GetStatus" {
+		command.GetStatus = &GetStatus{}
+
+	} else if temp.Type == "Connect" {
+		err := json.Unmarshal(data, &command.Connect)
 		if err != nil {
 			return err
 		}
+
+	} else if temp.Type == "Disconnect" {
+		command.Disconnect = &Disconnect{}
+
+	} else if temp.Type == "Discover" {
+
+		err := json.Unmarshal(data, &command.Discover)
+		if err != nil {
+			return err
+		}
+
 	} else {
 		return errors.New("can not decode unknown command")
 	}
+
 	return nil
 }
 
 // Message that can be sent to Play
 type Message struct {
-	*SensoConnection
+	*Status
+
+	Discovered *zeroconf.ServiceEntry
 }
 
-// SensoConnection describes where we are connected to
-type SensoConnection struct {
-	Type    string `json:"type"`
-	Address string `json:"address"`
+// Status is a message containing status information
+type Status struct {
+	Address *string
 }
 
-// MarshalJSON implementes encoding/json Marshaler interface for Message
+// MarshalJSON ipmlements JSON encoder for messages
 func (message *Message) MarshalJSON() ([]byte, error) {
-	if message.SensoConnection != nil {
+	if message.Status != nil {
 		return json.Marshal(&struct {
-			Type            string           `json:"type"`
-			SensoConnection *SensoConnection `json:"connection"`
+			Type    string  `json:"type"`
+			Address *string `json:"address"`
 		}{
-			Type:            "SensoConnection",
-			SensoConnection: message.SensoConnection,
+			Type:    "Status",
+			Address: message.Status.Address,
+		})
+
+	} else if message.Discovered != nil {
+		return json.Marshal(&struct {
+			Type         string                 `json:"type"`
+			ServiceEntry *zeroconf.ServiceEntry `json:"service"`
+			IP           []net.IP               `json:"ip"`
+		}{
+			Type:         "Discovered",
+			ServiceEntry: message.Discovered,
+			IP:           append(message.Discovered.AddrIPv4, message.Discovered.AddrIPv6...),
 		})
 
 	}
@@ -79,6 +121,7 @@ func (message *Message) MarshalJSON() ([]byte, error) {
 // Implement net/http Handler interface
 func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
+	// Set up logger
 	var log = handle.log.WithFields(logrus.Fields{
 		"clientAddress": r.RemoteAddr,
 		"userAgent":     r.UserAgent(),
@@ -126,6 +169,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if messageType == websocket.BinaryMessage {
 				log.WithField("data", msg).Debug("forwarding data to control port")
 				handle.Control <- msg
+
 			} else if messageType == websocket.TextMessage {
 
 				var command Command
@@ -136,36 +180,48 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// TODO: log the entire command nicer
-				// log.WithField("command", string(msg[:])).Debug("received command")
 				log.WithField("command", command).Debug("received command")
 
-				if command.GetSensoConnection != nil {
+				if command.GetStatus != nil {
+
 					var message Message
 
-					message.SensoConnection = &SensoConnection{Type: "IP", Address: handle.RemoteAddress}
+					message.Status = &Status{Address: handle.Address}
 
-					// encoded, encodeErr := message.MarshallJSON()
-					encoded, encodeErr := json.Marshal(&message)
-					if encodeErr != nil {
-						log.WithError(encodeErr).Error("could not encode message")
-						continue
-					}
-
-					writeErr := conn.WriteMessage(websocket.TextMessage, encoded)
-					// writeErr := conn.WriteJSON(&message)
+					writeErr := conn.WriteJSON(&message)
 					if writeErr != nil {
-						log.WithError(writeErr).Error("could not send message to websocket client")
+						log.WithError(writeErr).Error("could not send Status message to websocket client")
 						continue
 					}
 
-				} else if command.SensoConnect != nil {
-					connectionType := command.SensoConnect.SensoConnection.Type
-					if connectionType == "IP" {
-						handle.Connect(command.SensoConnect.SensoConnection.Address)
-					} else {
-						// TODO: think about if this should cause a warning
-						log.Warn("do not know how to handle connection type " + connectionType)
-					}
+				} else if command.Connect != nil {
+					handle.Connect(command.Connect.Address)
+
+				} else if command.Disconnect != nil {
+					handle.Disconnect()
+
+				} else if command.Discover != nil {
+
+					discoveryCtx, cancelDiscovery := context.WithTimeout(context.Background(), time.Duration(command.Discover.Duration)*time.Second)
+					defer cancelDiscovery()
+
+					entries := handle.Discover(discoveryCtx)
+
+					go func(entries chan *zeroconf.ServiceEntry) {
+						for entry := range entries {
+							log.WithField("service", entry).Debug("discovered service")
+
+							var message Message
+							message.Discovered = entry
+							writeErr := conn.WriteJSON(&message)
+							if writeErr != nil {
+								log.WithError(writeErr).Error("could not send Discovered message to websocket client")
+							}
+
+						}
+						log.Debug("discovery finished")
+					}(entries)
+
 				}
 
 			}

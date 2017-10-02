@@ -1,7 +1,7 @@
 const WebSocket = require('ws')
 
 function connect () {
-  const ws = new WebSocket('wss://localhost.dividat.com:8382/log')
+  const ws = new WebSocket('ws://127.0.0.1:8382/log')
 
   ws.onmessage = (e) => {
     console.log(JSON.parse(e.data))

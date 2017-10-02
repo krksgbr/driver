@@ -11,7 +11,7 @@ type Handle struct {
 	Data    chan []byte
 	Control chan []byte
 
-	RemoteAddress string
+	Address *string
 
 	ctx context.Context
 
@@ -28,7 +28,7 @@ func New(ctx context.Context, log *logrus.Entry) *Handle {
 
 	handle.log = log
 
-	// Make channels
+	// Channels for data and control
 	handle.Data = make(chan []byte)
 	handle.Control = make(chan []byte)
 
@@ -42,7 +42,7 @@ func (handle *Handle) Connect(address string) {
 	handle.Disconnect()
 
 	// set address in handle
-	handle.RemoteAddress = address
+	handle.Address = &address
 
 	// Create a child context for a new connection. This allows an individual connection (attempt) to be cancelled without restarting the whole Senso handler
 	ctx, cancel := context.WithCancel(handle.ctx)
@@ -60,6 +60,6 @@ func (handle *Handle) Disconnect() {
 	if handle.cancelCurrentConnection != nil {
 		handle.log.Info("disconnecting from Senso")
 		handle.cancelCurrentConnection()
-		handle.RemoteAddress = ""
+		handle.Address = nil
 	}
 }

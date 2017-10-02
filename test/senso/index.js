@@ -62,8 +62,8 @@ describe('Basic functionality', () => {
 // Sends a command to Driver (over WS) to connect with the mock senso
   function connectWithMockSenso (ws) {
     const cmd = JSON.stringify({
-      type: 'SensoConnect',
-      connection: {type: 'IP', address: '127.0.0.1'}
+      type: 'Connect',
+      address: '127.0.0.1'
     })
 
     ws.send(cmd)
@@ -78,6 +78,7 @@ describe('Basic functionality', () => {
       return ws
     })
   }
+
   it('Can connect to Senso WebSocket endpoint.', async () => {
     const log = await connectWithLog()
 
@@ -106,16 +107,16 @@ describe('Basic functionality', () => {
     await connectSensoWS()
     .then(connectWithMockSenso)
 
-    await Promise.all([controlConnection, dataConnection])
+    return Promise.all([controlConnection, dataConnection])
   })
 
   it('Can get connection status', async function () {
-    this.timeout(0)
+    this.timeout(500)
 
     const sensoWS = await connectSensoWS()
     .then((ws) => {
       const cmd = JSON.stringify({
-        type: 'GetSensoConnection'
+        type: 'GetStatus'
       })
       ws.send(cmd)
       return ws
@@ -123,7 +124,7 @@ describe('Basic functionality', () => {
 
     return expectEvent(sensoWS, 'message', (s) => {
       const msg = JSON.parse(s)
-      expect(msg.type).to.be.equal('SensoConnection')
+      expect(msg.type).to.be.equal('Status')
       return true
     })
   })
@@ -140,5 +141,31 @@ describe('Basic functionality', () => {
     senso.data.stream.write(buffer)
 
     return readBuffer
+  })
+
+  it('Can discover mock Senso', async function () {
+    this.timeout(6000)
+
+    // connect with Senso WS
+    const sensoWS = await connectSensoWS()
+
+    // start fake mdns responder
+    const bonjour = require('bonjour')()
+    bonjour.publish({name: 'Senso data replayer', type: 'sensoControl', port: '55567', txt: {msg: 'Hello!'}})
+
+    // Expect a Discovered message
+    const expectDiscovered = expectEvent(sensoWS, 'message', (s) => {
+      const msg = JSON.parse(s)
+      return (msg.type === 'Discovered')
+    })
+
+    // Send Discover command
+    const cmd = JSON.stringify({
+      type: 'Discover',
+      duration: 5
+    })
+    sensoWS.send(cmd)
+
+    return expectDiscovered
   })
 })

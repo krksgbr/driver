@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "bluebird": "^3.5.0",
+    "bonjour": "^3.5.0",
     "chai": "^4.1.1",
     "mocha": "^3.5.0",
     "request": "^2.81.0",
