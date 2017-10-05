@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -137,13 +138,20 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("WebSocket connection opened")
 
+	// create a mutex for writing to WebSocket (connection supports only one concurrent reader and one concurrent writer (https://godoc.org/github.com/gorilla/websocket#hdr-Concurrency))
+	writeMutex := sync.Mutex{}
+
 	// send data
 	go func() {
 		for data := range handle.Data {
 			// fmt.Println(data)
 			conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
 			defer conn.Close()
+
+			writeMutex.Lock()
 			err := conn.WriteMessage(websocket.BinaryMessage, data)
+			writeMutex.Unlock()
+
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
 					log.WithError(err).Error("WebSocket error")
@@ -175,7 +183,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				var command Command
 				decodeErr := json.Unmarshal(msg, &command)
 				if decodeErr != nil {
-					log.WithField("rawCommand", msg).WithError(decodeErr).Error("can not decode command")
+					log.WithField("rawCommand", msg).WithError(decodeErr).Warning("can not decode command")
 					continue
 				}
 
@@ -188,7 +196,10 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 					message.Status = &Status{Address: handle.Address}
 
+					writeMutex.Lock()
 					writeErr := conn.WriteJSON(&message)
+					writeMutex.Unlock()
+
 					if writeErr != nil {
 						log.WithError(writeErr).Error("could not send Status message to websocket client")
 						continue
@@ -213,7 +224,11 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 							var message Message
 							message.Discovered = entry
+
+							writeMutex.Lock()
 							writeErr := conn.WriteJSON(&message)
+							writeMutex.Unlock()
+
 							if writeErr != nil {
 								log.WithError(writeErr).Error("could not send Discovered message to websocket client")
 							}
