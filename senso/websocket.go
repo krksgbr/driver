@@ -26,6 +26,19 @@ type Command struct {
 	*Discover
 }
 
+func prettyPrintCommand(command Command) string {
+	if command.GetStatus != nil {
+		return "GetStatus"
+	} else if command.Connect != nil {
+		return "Connect"
+	} else if command.Disconnect != nil {
+		return "Disconnect"
+	} else if command.Disconnect != nil {
+		return "Discover"
+	}
+	return "Unknown"
+}
+
 // GetStatus command
 type GetStatus struct{}
 
@@ -144,11 +157,12 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// send data
 	go func() {
 		for data := range handle.Data {
+
 			// fmt.Println(data)
-			conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
 			defer conn.Close()
 
 			writeMutex.Lock()
+			conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
 			err := conn.WriteMessage(websocket.BinaryMessage, data)
 			writeMutex.Unlock()
 
@@ -187,8 +201,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
-				// TODO: log the entire command nicer
-				log.WithField("command", command).Debug("received command")
+				log.WithField("command", prettyPrintCommand(command)).Debug("received command")
 
 				if command.GetStatus != nil {
 
@@ -197,6 +210,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					message.Status = &Status{Address: handle.Address}
 
 					writeMutex.Lock()
+					conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
 					writeErr := conn.WriteJSON(&message)
 					writeMutex.Unlock()
 
@@ -226,6 +240,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							message.Discovered = entry
 
 							writeMutex.Lock()
+							conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
 							writeErr := conn.WriteJSON(&message)
 							writeMutex.Unlock()
 

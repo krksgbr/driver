@@ -72,7 +72,7 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 
 				case writeError := <-writeErrors:
 					if err, ok := writeError.(net.Error); ok && err.Timeout() {
-						log.Debug("timeout")
+						log.Debug("timeout on write")
 					} else {
 						log.WithError(writeError).Error("write error")
 						close(writeChannel)
