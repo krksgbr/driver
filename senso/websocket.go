@@ -190,7 +190,10 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			if messageType == websocket.BinaryMessage {
 				log.WithField("data", msg).Debug("forwarding data to control port")
-				handle.Control <- msg
+				select {
+				case handle.Control <- msg:
+				default:
+				}
 
 			} else if messageType == websocket.TextMessage {
 

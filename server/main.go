@@ -31,7 +31,6 @@ func Start() {
 
 	// Setup Senso
 	sensoHandle := senso.New(ctx, logrus.WithField("package", "senso"))
-	// sensoHandle.Connect("127.0.0.1")
 	http.Handle("/senso", sensoHandle)
 
 	// Create a logger for server
@@ -46,8 +45,8 @@ func Start() {
 		"version": version,
 	})
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
-
 		w.Write(rootMsg)
 	})
 

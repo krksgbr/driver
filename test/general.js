@@ -51,8 +51,7 @@ it('Connect to log WebSocket endpoint and receive log entry.', async () => {
   })
 
   // Cause a log entry
-  // TODO: check if this works on windows. SIGHUP is a POSIX signal and might not be implemented on Windows.
-  driver.kill('SIGHUP')
+  driver.kill('SIGUSR1')
 
   return receiveLogEntry
 })
