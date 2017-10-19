@@ -63,7 +63,6 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 						default:
 						}
 					} else {
-						close(writeChannel)
 						break DataLoop
 					}
 
@@ -75,7 +74,6 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 						log.Debug("timeout on write")
 					} else {
 						log.WithError(writeError).Error("write error")
-						close(writeChannel)
 						break DataLoop
 					}
 				}
