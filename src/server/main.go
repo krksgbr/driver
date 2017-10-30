@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/dividat/driver-go/senso"
+	"senso"
 
 	"github.com/sirupsen/logrus"
 )

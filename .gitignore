@@ -1,7 +1,8 @@
-vendor/
-node_modules/
+src/vendor/
 
 # generated go-bindata file
 server/ssl.go
 
 release/
+bin/
+pkg/

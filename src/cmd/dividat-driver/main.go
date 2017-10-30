@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/dividat/driver-go/server"
+	"server"
 )
 
 func main() {
