@@ -1,8 +1,10 @@
 all: build
 
+CWD=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))
+
 deps:
 	glide install
 
 build:
-	go build -v -o release/dividat-driver ./cmd/dividat-driver
+	GOPATH=$(CWD) go build -v -o release/dividat-driver src/cmd/dividat-driver/main.go
 	upx release/dividat-driver

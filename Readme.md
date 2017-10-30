@@ -10,15 +10,12 @@ Dividat drivers and hardware test suites (in Go!).
 
 ## Quick start
 
--   Clone repository to your `$GOPATH`:
+-   Clone repository, this will be the $GOPATH
 
-        cd $GOPATH
-        mkdir -p github.com/dividat
-        cd github.com/dividat
-        git clone git@github.com:dividat/driver-go.git
+-   In your editor settings, set $GOPATH to repo if needed
 
--   Install dependenceis with glide:
-        glide Install
+-   Install dependencies with glide:
+        cd src && glide install && cd ..
 
 -   Build and run
         make
