@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/sirupsen/logrus"
 )
 
@@ -14,80 +15,80 @@ import (
 const dialTimeout = 1 * time.Second
 const retryTimeout = 5 * time.Second
 
+var exp = backoff.NewExponentialBackOff()
+
 // connectTCP creates a persistent tcp connection to address
 func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, data chan []byte) {
 	var dialer net.Dialer
 
 	var log = baseLogger.WithField("address", address)
 
-	// loop to retry connection
-	for {
-		// attempt to open a new connection
-		dialer.Deadline = time.Now().Add(dialTimeout)
+	// attempt to open a new connection
+	dialer.Deadline = time.Now().Add(dialTimeout)
+
+	var conn net.Conn
+	dialTCP := func() error {
+		var connErr error
 		log.Info("dialing")
-		conn, connErr := dialer.DialContext(ctx, "tcp", address)
+		conn, connErr = dialer.DialContext(ctx, "tcp", address)
+		return connErr
+	}
 
-		if connErr != nil {
-			log.WithError(connErr).Info("dial failed")
-		} else {
+	connErr := backoff.Retry(dialTCP, backoff.NewExponentialBackOff())
 
-			log.Info("connected")
+	if connErr != nil {
+		log.WithError(connErr).Info("dial failed")
+	} else {
 
-			// Close connection if we break or return
-			defer conn.Close()
+		log.Info("connected")
 
-			// create channel for reading data and go read
-			readChannel := make(chan []byte)
-			go tcpReader(log, conn, readChannel)
+		// Close connection if we break or return
+		defer conn.Close()
 
-			// create channel for writing data
-			writeChannel := make(chan []byte)
-			// We need an additional channel for handling write errors, unlike the readChannel we don't want to close the channel as somebody might try to write to it
-			writeErrors := make(chan error)
-			defer close(writeChannel)
-			go tcpWriter(conn, writeChannel, writeErrors)
+		// create channel for reading data and go read
+		readChannel := make(chan []byte)
+		go tcpReader(log, conn, readChannel)
 
-			// Inner loop for handling data
-		DataLoop:
-			for {
-				select {
+		// create channel for writing data
+		writeChannel := make(chan []byte)
+		// We need an additional channel for handling write errors, unlike the readChannel we don't want to close the channel as somebody might try to write to it
+		writeErrors := make(chan error)
+		defer close(writeChannel)
+		go tcpWriter(conn, writeChannel, writeErrors)
 
-				case <-ctx.Done():
-					return
+		// Inner loop for handling data
+		for {
+			select {
 
-				case receivedData, more := <-readChannel:
-					if more {
-						// Attempt to send data, if can not send immediately discard
-						select {
-						case data <- receivedData:
-						default:
-						}
-					} else {
-						break DataLoop
-					}
+			case <-ctx.Done():
+				return
 
-				case dataToWrite := <-data:
-					writeChannel <- dataToWrite
-
-				case writeError := <-writeErrors:
-					if err, ok := writeError.(net.Error); ok && err.Timeout() {
-						log.Debug("timeout on write")
-					} else {
-						log.WithError(writeError).Error("write error")
-						break DataLoop
+			case receivedData, more := <-readChannel:
+				if more {
+					// Attempt to send data, if can not send immediately discard
+					select {
+					case data <- receivedData:
+					default:
 					}
 				}
-			}
 
+			case dataToWrite := <-data:
+				writeChannel <- dataToWrite
+
+			case writeError := <-writeErrors:
+				if err, ok := writeError.(net.Error); ok && err.Timeout() {
+					log.Debug("timeout on write")
+				} else {
+					log.WithError(writeError).Error("write error")
+				}
+			}
 		}
-		// Check if connection has been cancelled
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			// Sleep 5s before reattempting to reconnect
-			time.Sleep(retryTimeout)
-		}
+
+	}
+	// Check if connection has been cancelled
+	select {
+	case <-ctx.Done():
+		return
 
 	}
 }
