@@ -13,12 +13,11 @@ import (
 
 // TODO: implement a backoff strategy
 const dialTimeout = 1 * time.Second
-const retryTimeout = 5 * time.Second
 
 var exp = backoff.NewExponentialBackOff()
 
 // connectTCP creates a persistent tcp connection to address
-func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, data chan []byte) {
+func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, data chan []byte, delay time.Duration) {
 	var dialer net.Dialer
 
 	var log = baseLogger.WithField("address", address)
@@ -34,6 +33,7 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 		return connErr
 	}
 
+	time.Sleep(delay)
 	connErr := backoff.Retry(dialTCP, backoff.NewExponentialBackOff())
 
 	if connErr != nil {

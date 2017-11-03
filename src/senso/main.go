@@ -2,6 +2,7 @@ package senso
 
 import (
 	"context"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -49,8 +50,8 @@ func (handle *Handle) Connect(address string) {
 
 	handle.log.WithField("address", address).Info("attempting to connect with Senso")
 
-	go connectTCP(ctx, handle.log.WithField("channel", "data"), address+":55568", handle.Data)
-	go connectTCP(ctx, handle.log.WithField("channel", "control"), address+":55567", handle.Control)
+	go connectTCP(ctx, handle.log.WithField("channel", "data"), address+":55568", handle.Data, 0)
+	go connectTCP(ctx, handle.log.WithField("channel", "control"), address+":55567", handle.Control, 20*time.Millisecond)
 
 	handle.cancelCurrentConnection = cancel
 }
