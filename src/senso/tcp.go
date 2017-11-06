@@ -14,10 +14,8 @@ import (
 // TODO: implement a backoff strategy
 const dialTimeout = 1 * time.Second
 
-var exp = backoff.NewExponentialBackOff()
-
 // connectTCP creates a persistent tcp connection to address
-func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, data chan []byte, delay time.Duration) {
+func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, data chan []byte) {
 	var dialer net.Dialer
 
 	var log = baseLogger.WithField("address", address)
@@ -30,15 +28,15 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 		var connErr error
 		log.Info("dialing")
 		conn, connErr = dialer.DialContext(ctx, "tcp", address)
+		if connErr != nil {
+			log.WithError(connErr).Info("Dial error")
+		}
 		return connErr
 	}
 
-	time.Sleep(delay)
 	connErr := backoff.Retry(dialTCP, backoff.NewExponentialBackOff())
 
-	if connErr != nil {
-		log.WithError(connErr).Info("dial failed")
-	} else {
+	for connErr == nil {
 
 		log.Info("connected")
 
@@ -57,7 +55,8 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 		go tcpWriter(conn, writeChannel, writeErrors)
 
 		// Inner loop for handling data
-		for {
+		disconnected := false
+		for !disconnected {
 			select {
 
 			case <-ctx.Done():
@@ -70,6 +69,8 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 					case data <- receivedData:
 					default:
 					}
+				} else {
+					disconnected = true
 				}
 
 			case dataToWrite := <-data:
@@ -80,15 +81,21 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 					log.Debug("timeout on write")
 				} else {
 					log.WithError(writeError).Error("write error")
+					disconnected = true
 				}
 			}
 		}
 
-	}
-	// Check if connection has been cancelled
-	select {
-	case <-ctx.Done():
-		return
+		// Check if connection has been cancelled
+		select {
+		case <-ctx.Done():
+			return
+
+		default:
+			log.Debug("reconnecting")
+			conn.Close()
+			connErr = backoff.Retry(dialTCP, backoff.NewExponentialBackOff())
+		}
 
 	}
 }
