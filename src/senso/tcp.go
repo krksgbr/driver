@@ -20,13 +20,16 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 
 	var log = baseLogger.WithField("address", address)
 
-	// attempt to open a new connection
-	dialer.Deadline = time.Now().Add(dialTimeout)
-
 	var conn net.Conn
 	dialTCP := func() error {
+		// attempt to open a new connection
+		dialer.Deadline = time.Now().Add(dialTimeout)
 		var connErr error
 		log.Info("dialing")
+		if conn != nil {
+			conn.Close()
+		}
+
 		conn, connErr = dialer.DialContext(ctx, "tcp", address)
 		if connErr != nil {
 			log.WithError(connErr).Info("Dial error")
@@ -93,7 +96,6 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 
 		default:
 			log.Debug("reconnecting")
-			conn.Close()
 			connErr = backoff.Retry(dialTCP, backoff.NewExponentialBackOff())
 		}
 
