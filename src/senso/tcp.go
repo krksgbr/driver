@@ -7,12 +7,18 @@ import (
 	"net"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/sirupsen/logrus"
 )
 
-// TODO: implement a backoff strategy
-const dialTimeout = 1 * time.Second
-const retryTimeout = 5 * time.Second
+// How long to wait before timeing out a tcp connection attempt
+const dialTimeout = 5 * time.Second
+
+// never stop retrying to connect
+const maxElapsedTime = 0
+
+// maximal interval to wait between connection retry
+const maxInterval = 30 * time.Second
 
 // connectTCP creates a persistent tcp connection to address
 func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, data chan []byte) {
@@ -20,73 +26,91 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 
 	var log = baseLogger.WithField("address", address)
 
-	// loop to retry connection
-	for {
+	var conn net.Conn
+	dialTCP := func() error {
 		// attempt to open a new connection
 		dialer.Deadline = time.Now().Add(dialTimeout)
+		var connErr error
 		log.Info("dialing")
-		conn, connErr := dialer.DialContext(ctx, "tcp", address)
+		if conn != nil {
+			conn.Close()
+		}
 
+		conn, connErr = dialer.DialContext(ctx, "tcp", address)
 		if connErr != nil {
-			log.WithError(connErr).Info("dial failed")
-		} else {
+			log.WithError(connErr).Info("Dial error")
+		}
+		return connErr
+	}
 
-			log.Info("connected")
+	var backOffStrategy = backoff.NewExponentialBackOff()
 
-			// Close connection if we break or return
-			defer conn.Close()
+	// Never stop retrying
+	backOffStrategy.MaxElapsedTime = maxElapsedTime
 
-			// create channel for reading data and go read
-			readChannel := make(chan []byte)
-			go tcpReader(log, conn, readChannel)
+	// Set maximum interval to 30s
+	backOffStrategy.MaxInterval = maxInterval
 
-			// create channel for writing data
-			writeChannel := make(chan []byte)
-			// We need an additional channel for handling write errors, unlike the readChannel we don't want to close the channel as somebody might try to write to it
-			writeErrors := make(chan error)
-			defer close(writeChannel)
-			go tcpWriter(conn, writeChannel, writeErrors)
+	for true {
 
-			// Inner loop for handling data
-		DataLoop:
-			for {
-				select {
+		backOffStrategy.Reset()
+		backoff.Retry(dialTCP, backOffStrategy)
 
-				case <-ctx.Done():
-					return
+		log.Info("connected")
 
-				case receivedData, more := <-readChannel:
-					if more {
-						// Attempt to send data, if can not send immediately discard
-						select {
-						case data <- receivedData:
-						default:
-						}
-					} else {
-						break DataLoop
+		// Close connection if we break or return
+		defer conn.Close()
+
+		// create channel for reading data and go read
+		readChannel := make(chan []byte)
+		go tcpReader(log, conn, readChannel)
+
+		// create channel for writing data
+		writeChannel := make(chan []byte)
+		// We need an additional channel for handling write errors, unlike the readChannel we don't want to close the channel as somebody might try to write to it
+		writeErrors := make(chan error)
+		defer close(writeChannel)
+		go tcpWriter(conn, writeChannel, writeErrors)
+
+		// Inner loop for handling data
+		disconnected := false
+		for !disconnected {
+			select {
+
+			case <-ctx.Done():
+				return
+
+			case receivedData, more := <-readChannel:
+				if more {
+					// Attempt to send data, if can not send immediately discard
+					select {
+					case data <- receivedData:
+					default:
 					}
+				} else {
+					disconnected = true
+				}
 
-				case dataToWrite := <-data:
-					writeChannel <- dataToWrite
+			case dataToWrite := <-data:
+				writeChannel <- dataToWrite
 
-				case writeError := <-writeErrors:
-					if err, ok := writeError.(net.Error); ok && err.Timeout() {
-						log.Debug("timeout on write")
-					} else {
-						log.WithError(writeError).Error("write error")
-						break DataLoop
-					}
+			case writeError := <-writeErrors:
+				if err, ok := writeError.(net.Error); ok && err.Timeout() {
+					log.Debug("timeout on write")
+				} else {
+					log.WithError(writeError).Error("write error")
+					disconnected = true
 				}
 			}
-
 		}
+
 		// Check if connection has been cancelled
 		select {
 		case <-ctx.Done():
 			return
+
 		default:
-			// Sleep 5s before reattempting to reconnect
-			time.Sleep(retryTimeout)
+			log.Debug("reconnecting")
 		}
 
 	}

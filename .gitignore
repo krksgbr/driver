@@ -4,3 +4,4 @@ src/vendor/
 release/
 bin/
 pkg/
+src/cmd/dividat-driver/debug
