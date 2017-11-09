@@ -11,8 +11,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// TODO: implement a backoff strategy
-const dialTimeout = 1 * time.Second
+// How long to wait before timeing out a tcp connection attempt
+const dialTimeout = 5 * time.Second
+
+// never stop retrying to connect
+const maxElapsedTime = 0
+
+// maximal interval to wait between connection retry
+const maxInterval = 30 * time.Second
 
 // connectTCP creates a persistent tcp connection to address
 func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, data chan []byte) {
@@ -37,9 +43,18 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 		return connErr
 	}
 
-	connErr := backoff.Retry(dialTCP, backoff.NewExponentialBackOff())
+	var backOffStrategy = backoff.NewExponentialBackOff()
 
-	for connErr == nil {
+	// Never stop retrying
+	backOffStrategy.MaxElapsedTime = maxElapsedTime
+
+	// Set maximum interval to 30s
+	backOffStrategy.MaxInterval = maxInterval
+
+	for true {
+
+		backOffStrategy.Reset()
+		backoff.Retry(dialTCP, backOffStrategy)
 
 		log.Info("connected")
 
@@ -96,7 +111,6 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 
 		default:
 			log.Debug("reconnecting")
-			connErr = backoff.Retry(dialTCP, backoff.NewExponentialBackOff())
 		}
 
 	}
