@@ -6,7 +6,12 @@ Dividat drivers and hardware test suites (in Go!).
 
 -   [Go](https://golang.org/)
 -   [Glide](https://glide.sh/)
+
+For packaging:
+
 -   [UPX](https://upx.github.io/)
+-   osslsigncode (macOS: `brew install osslsigncode`)
+-   AWS CLI (macOS: `brew install awscli`)
 
 ## Compatibility
 
