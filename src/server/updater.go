@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"path"
 	"runtime"
 	"strings"
 	"time"
@@ -26,64 +27,64 @@ type LatestRelease struct {
 }
 
 // Update diver: watch for a new version, then download and swap binary
-func Update(log *logrus.Entry, channel string, version string) {
-
+func startUpdateLoop(log *logrus.Entry, channel string, version string) {
 	updateTicker := time.NewTicker(updateInterval)
-
-	downloadAndApply(log.WithField("package", "server"), channel, version)
-	go func() {
-		for {
-			select {
-			case <-updateTicker.C:
-				// downloadAndApply(log.WithField("package", "server"), channel, version)
-			}
+	for {
+		select {
+		case <-updateTicker.C:
+			downloadAndApply(log.WithField("package", "server"), channel, version)
 		}
-	}()
-
+	}
 }
 
 func downloadAndApply(log *logrus.Entry, channel string, version string) {
+	log.Info("Checking if udpate is needed...")
+
 	var latestURL = releaseServer + channel + "/latest.json"
-	log.Info("Downloading latest info from " + latestURL)
-	latestResp, latestErr := http.Get(latestURL)
-
-	if latestErr != nil {
-		log.Error(latestErr)
-		return
-	}
-
-	latestRelease := new(LatestRelease)
-	latestReleasePayload, _ := ioutil.ReadAll(latestResp.Body)
-	err := json.Unmarshal(latestReleasePayload, &latestRelease)
+	log.Debug("Downloading latest info from " + latestURL)
+	latestResp, err := http.Get(latestURL)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
-	log.Info("Current version: " + version + " / Next version: " + latestRelease.Version)
+	log.Debug("Unmarshalling latest release data")
+	latestRelease := new(LatestRelease)
+	latestReleasePayload, _ := ioutil.ReadAll(latestResp.Body)
+	if err = json.Unmarshal(latestReleasePayload, &latestRelease); err != nil {
+		log.Error(err)
+		return
+	}
 
 	if latestRelease.Version != version {
+		log.Info("Current version (" + version + ") differs from latest version (" + latestRelease.Version + "), downloading update.")
+
 		var filename = "dividat-driver-" + runtime.GOOS + "-" + runtime.GOARCH + "-" + latestRelease.Version
-		var versionURL = releaseServer + channel + "/" + latestRelease.Version + "/" + runtime.GOOS + "/" + filename
+		var versionURL = releaseServer + path.Join(channel, latestRelease.Version, runtime.GOOS, filename)
 		var shaURL = versionURL + ".sha256"
 
-		log.Info("Downloading new release from " + versionURL)
-		binResp, binErr := http.Get(versionURL)
-		if binErr != nil {
-			log.Error(binErr)
+		log.Debug("Downloading new release from " + versionURL)
+		var binResp *http.Response
+		if binResp, err = http.Get(versionURL); err != nil {
+			log.Error(err)
 			return
 		}
-		defer binResp.Body.Close()
 
-		shaResp, _ := http.Get(shaURL)
-
-		log.Info("Download successful. Now applying update..")
-		expectedChecksum, checksumErr := getExpectedChecksum(shaResp, filename)
-		if checksumErr != nil {
-			log.Error(checksumErr)
+		log.Debug("Downloading checksum file from " + shaURL)
+		var shaResp *http.Response
+		if shaResp, err = http.Get(shaURL); err != nil {
+			log.Error(err)
 			return
-
 		}
+
+		log.Debug("Reading expected checksum")
+		var expectedChecksum []byte
+		if expectedChecksum, err = readExpectedChecksum(shaResp, filename); err != nil {
+			log.Error(err)
+			return
+		}
+
+		log.Debug("Applying downloaded update")
 		err = update.Apply(binResp.Body, update.Options{
 			Checksum: expectedChecksum,
 		})
@@ -93,10 +94,12 @@ func downloadAndApply(log *logrus.Entry, channel string, version string) {
 		}
 
 		log.Info("Update done.")
+	} else {
+		log.Info("Current version (" + version + ") is latest.")
 	}
 }
 
-func getExpectedChecksum(shaResp *http.Response, filename string) ([]byte, error) {
+func readExpectedChecksum(shaResp *http.Response, filename string) ([]byte, error) {
 	scanner := bufio.NewScanner(shaResp.Body)
 	for scanner.Scan() {
 		parts := strings.Split(scanner.Text(), "  ")

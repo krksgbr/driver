@@ -42,9 +42,7 @@ func Start() {
 	go startMonitor(logrus.WithField("package", "monitor"))
 
 	// Setup driver update loop
-	// if channel != "dev" {
-	go Update(logrus.WithField("package", "server"), channel, version)
-	// }
+	go startUpdateLoop(logrus.WithField("package", "update"), channel, version)
 
 	// Server root
 	rootMsg, _ := json.Marshal(map[string]string{
