@@ -32,7 +32,7 @@ func startUpdateLoop(log *logrus.Entry, channel string, version string) {
 	for {
 		select {
 		case <-updateTicker.C:
-			downloadAndApply(log.WithField("package", "server"), channel, version)
+			downloadAndApply(log, channel, version)
 		}
 	}
 }
