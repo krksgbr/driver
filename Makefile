@@ -27,11 +27,11 @@ WINDOWS = $(RELEASE_DIR)/win32/$(BIN)-win32-amd64-$(VERSION).exe
 LATEST = release/latest.json
 
 deps:
-	glide install
+	cd src && glide install
 
 .PHONY: build
 build:
-	GOPATH=$(GOPATH) go build -ldflags "-X server.channel=dev" -v -o bin/dividat-driver $(SRC)
+	GOPATH=$(GOPATH) go build -ldflags "-X server.channel=dev -X server.version=$(shell git describe HEAD)" -v -o bin/dividat-driver $(SRC)
 
 crossbuild: check-version $(LINUX) $(DARWIN) $(WINDOWS) $(LATEST)
 
