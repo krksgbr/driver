@@ -27,8 +27,8 @@ Firefox, Safari and Edge not supported as they are not yet properly implementing
 
 -   In your editor settings, set $GOPATH to repo if needed
 
--   Install dependencies with glide:
-        cd src && glide install && cd ..
+-   Install dependencies:
+        make deps
 
 -   Build and run
         make
@@ -36,7 +36,7 @@ Firefox, Safari and Edge not supported as they are not yet properly implementing
 
     Or use `go run`:
 
-        go run cmd/dividat-driver/main.go start
+        go run src/cmd/dividat-driver/main.go start
 
 ## Notes
 
@@ -46,4 +46,3 @@ Firefox, Safari and Edge not supported as they are not yet properly implementing
 ## TODO
 
 -   Senso discovery (<https://github.com/grandcat/zeroconf>)
--   Selfupdate (<https://github.com/inconshreveable/go-update> and possibly <https://github.com/flynn/go-tuf>)
