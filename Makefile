@@ -38,18 +38,18 @@ crossbuild: check-version $(LINUX) $(DARWIN) $(WINDOWS) $(LATEST)
 $(LINUX):
 	$(call build-os,linux,$@)
 	upx $@
-	$(call write-checksum,$@)
+	$(call write-metadata,$@)
 
 $(DARWIN):
 	$(call build-os,darwin,$@)
 	upx $@
-	$(call write-checksum,$@)
+	$(call write-metadata,$@)
 
 $(WINDOWS):
 	$(call build-os,windows,$@)
 	upx $@
 	$(call sign-bin,$@)
-	$(call write-checksum,$@)
+	$(call write-metadata,$@)
 
 $(LATEST):
 	echo "{\"version\": \"$(VERSION)\", \"commit\": \"$(COMMIT)\"}" > $@
@@ -61,14 +61,13 @@ define build-os
 		-o $(2) $(SRC)
 endef
 
-define write-checksum
-	cd `dirname $(1)` && shasum `basename $(1)` -a 256 > `basename $(1)`.sha256
+define write-metadata
+  ./tools/gen-metadata.sh signingprivatekey.pem $(1) > `dirname $(1)`/metadata.json
 endef
 
 define sign-bin
 	osslsigncode sign \
 		-pkcs12 $(CODE_SIGNING_CERT) \
-		-pass $(CODE_SIGNING_PW) \
 		-h sha1 \
 		-n "Dividat Driver" \
 		-i "https://www.dividat.com/" \
