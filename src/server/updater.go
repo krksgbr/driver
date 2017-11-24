@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto"
 	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
@@ -9,18 +10,21 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/coreos/go-semver/semver"
 	"github.com/inconshreveable/go-update"
 	"github.com/sirupsen/logrus"
 )
 
 const releaseServer = "http://dist-test.dividat.ch.s3.amazonaws.com/releases/driver/"
 
+var latestURL = releaseServer + channel + "/latest.json"
+
 const updateInterval = 60 * time.Second
 
 var rawPublicKey = []byte(`
-----BEGIN PUBLIC KEY-----
-MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAElNVCWtYI8/Ehe0qz0Mx7YKhUNZnkp45R
-6aLbwop7e3H2DNSeG523WUFxNMqd36heSswFUp5RB8evaka6eto4MA==
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8sv+i3PuPlTcB3pPMgO87dtOq/ko
+2JsEBT+baM7jI+PWkFqpxnoziWF9SL0FU8euKNpxkowztWrmAqXgLZ5NPg==
 -----END PUBLIC KEY-----
 `)
 
@@ -40,51 +44,71 @@ var updateTicker *time.Ticker
 var updating = false
 
 // Update driver: watch for a new version, then download and swap binary
-func startUpdateLoop(log *logrus.Entry, channel string, version string) {
+func startUpdateLoop(baseLog *logrus.Entry) {
+	log := baseLog.WithFields(logrus.Fields{
+		"latestURL": latestURL,
+	})
 	updateTicker = time.NewTicker(updateInterval)
+	loop := func() {
+		if updating {
+			return
+		}
+		updating = true
+		updated, err := doUpdateLoop(log)
+		if err != nil {
+			log.Error(err)
+		}
+		if updated {
+			updateTicker.Stop()
+		}
+		updating = false
+	}
+
+	loop()
+
 	for {
 		select {
 		case <-updateTicker.C:
-			updating = true
-			updated, err := doUpdateLoop(log, channel, version)
-			if err != nil {
-				log.Error(err)
-			}
-			if updated {
-				updateTicker.Stop()
-			}
-			updating = false
+			loop()
 		}
 	}
 }
 
-func doUpdateLoop(log *logrus.Entry, channel string, version string) (bool, error) {
+func doUpdateLoop(log *logrus.Entry) (bool, error) {
 	log.Info("Checking if udpate is needed...")
 
-	latestRelease, err := getLatestReleaseInfo(log, channel)
+	latestRelease, err := getLatestReleaseInfo(log)
+	if err != nil {
+		return false, err
+	}
+	log = log.WithField("newVersion", latestRelease.Version)
+
+	latestSemVersion, err := semver.NewVersion(latestRelease.Version)
 	if err != nil {
 		return false, err
 	}
 
-	if latestRelease.Version != version {
-		log.Info("Current version (" + version + ") differs from latest version (" + latestRelease.Version + "), downloading update.")
+	currentSemVersion, err := semver.NewVersion(version)
+	if err != nil {
+		return false, err
+	}
 
+	if currentSemVersion.LessThan(*latestSemVersion) {
+		log.Info("Newer version discovered.")
 		err = downloadAndUpdate(log, latestRelease)
 		if err != nil {
 			return false, err
 		}
 
-		log.Info("Update done, ticker stopped, waiting for the restart.")
 		return true, nil
 	}
 
-	log.Info("Current version (" + version + ") is latest.")
+	log.Info("Current version is latest.")
 	return false, nil
 }
 
-func getLatestReleaseInfo(log *logrus.Entry, channel string) (*LatestRelease, error) {
-	var latestURL = releaseServer + channel + "/latest.json"
-	log.Debug("Downloading latest info from " + latestURL)
+func getLatestReleaseInfo(log *logrus.Entry) (*LatestRelease, error) {
+	log.Debug("Downloading latest info")
 	latestResp, err := http.Get(latestURL)
 	if err != nil {
 		return nil, err
@@ -100,6 +124,8 @@ func getLatestReleaseInfo(log *logrus.Entry, channel string) (*LatestRelease, er
 }
 
 func downloadAndUpdate(log *logrus.Entry, latestRelease *LatestRelease) error {
+	log.Info("Downloading update.")
+
 	var versionPath = releaseServer + path.Join(channel, latestRelease.Version, runtime.GOOS)
 	var filename = "dividat-driver-" + runtime.GOOS + "-" + runtime.GOARCH + "-" + latestRelease.Version
 	var binURL = versionPath + "/" + filename
@@ -130,14 +156,22 @@ func downloadAndUpdate(log *logrus.Entry, latestRelease *LatestRelease) error {
 		return err
 	}
 
-	log.Debug("Applying downloaded update")
-	err = update.Apply(binResp.Body, update.Options{
+	log.Debug("Building update options")
+	opts := update.Options{
 		Signature: signature,
-		PublicKey: rawPublicKey,
-	})
+		Hash:      crypto.SHA256,
+		Verifier:  update.NewECDSAVerifier(),
+	}
+	log.Debug("Setting public key")
+	err = opts.SetPublicKeyPEM(rawPublicKey)
 	if err != nil {
 		return err
 	}
-
+	log.Debug("Applying update")
+	err = update.Apply(binResp.Body, opts)
+	if err != nil {
+		return err
+	}
+	log.Info("Update done.")
 	return nil
 }

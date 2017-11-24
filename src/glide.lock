@@ -1,8 +1,12 @@
 hash: 5ab9fab2c8d70bf752fbad94d617f8c0ec848be2da153bd5b025613a92d09b59
-updated: 2017-11-09T15:20:44.432391901+01:00
+updated: 2017-11-24T15:44:35.201166641+01:00
 imports:
 - name: github.com/cenkalti/backoff
   version: 61153c768f31ee5f130071d08fc82b85208528de
+- name: github.com/coreos/go-semver
+  version: 1817cd4bea52af76542157eeabd74b057d1a199e
+  subpackages:
+  - semver
 - name: github.com/gorilla/websocket
   version: ea4d1f681babbce9545c9c5f3d5194a789c89f5b
 - name: github.com/grandcat/zeroconf
