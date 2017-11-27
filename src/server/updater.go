@@ -46,6 +46,8 @@ var updating = false
 // Update driver: watch for a new version, then download and swap binary
 func startUpdateLoop(baseLog *logrus.Entry) {
 	log := baseLog.WithFields(logrus.Fields{
+		"version":   version,
+		"channel":   channel,
 		"latestURL": latestURL,
 	})
 	updateTicker = time.NewTicker(updateInterval)

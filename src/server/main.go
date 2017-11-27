@@ -25,11 +25,10 @@ func Start() {
 	logrus.AddHook(logServer)
 	http.Handle("/log", logServer)
 
-	baseLog := logrus.WithFields(logrus.Fields{
+	logrus.WithFields(logrus.Fields{
 		"version": version,
 		"channel": channel,
-	})
-	baseLog.Info("Dividat Driver starting")
+	}).Info("Dividat Driver starting")
 
 	// Setup a context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -40,13 +39,13 @@ func Start() {
 	http.Handle("/senso", sensoHandle)
 
 	// Create a logger for server
-	log := baseLog.WithField("package", "server")
+	log := logrus.WithField("package", "server")
 
 	// Start the monitor
-	go startMonitor(baseLog.WithField("package", "monitor"))
+	go startMonitor(logrus.WithField("package", "monitor"))
 
 	// Setup driver update loop
-	go startUpdateLoop(baseLog.WithField("package", "update"))
+	go startUpdateLoop(logrus.WithField("package", "update"))
 
 	// Server root
 	rootMsg, _ := json.Marshal(map[string]string{
