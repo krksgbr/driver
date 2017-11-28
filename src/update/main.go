@@ -1,4 +1,4 @@
-package server
+package update
 
 import (
 	"crypto"
@@ -16,8 +16,6 @@ import (
 )
 
 const releaseServer = "http://dist-test.dividat.ch.s3.amazonaws.com/releases/driver/"
-
-var latestURL = releaseServer + channel + "/latest.json"
 
 const updateInterval = 60 * time.Second
 
@@ -43,12 +41,12 @@ type BinMetadata struct {
 var updateTicker *time.Ticker
 var updating = false
 
-// Update driver: watch for a new version, then download and swap binary
-func startUpdateLoop(baseLog *logrus.Entry) {
+// Start watch for a new version, then download and swap binary
+func Start(baseLog *logrus.Entry, version string, channel string) {
 	log := baseLog.WithFields(logrus.Fields{
 		"version":   version,
 		"channel":   channel,
-		"latestURL": latestURL,
+		"latestURL": latestJSONURL(channel),
 	})
 	updateTicker = time.NewTicker(updateInterval)
 	loop := func() {
@@ -56,7 +54,7 @@ func startUpdateLoop(baseLog *logrus.Entry) {
 			return
 		}
 		updating = true
-		updated, err := doUpdateLoop(log)
+		updated, err := doUpdateLoop(log, version, channel)
 		if err != nil {
 			log.Error(err)
 		}
@@ -76,10 +74,10 @@ func startUpdateLoop(baseLog *logrus.Entry) {
 	}
 }
 
-func doUpdateLoop(log *logrus.Entry) (bool, error) {
+func doUpdateLoop(log *logrus.Entry, version string, channel string) (bool, error) {
 	log.Info("Checking if udpate is needed...")
 
-	latestRelease, err := getLatestReleaseInfo(log)
+	latestRelease, err := GetLatestReleaseInfo(channel)
 	if err != nil {
 		return false, err
 	}
@@ -97,7 +95,7 @@ func doUpdateLoop(log *logrus.Entry) (bool, error) {
 
 	if currentSemVersion.LessThan(*latestSemVersion) {
 		log.Info("Newer version discovered.")
-		err = downloadAndUpdate(log, latestRelease)
+		err = downloadAndUpdate(log, channel, latestRelease)
 		if err != nil {
 			return false, err
 		}
@@ -109,14 +107,13 @@ func doUpdateLoop(log *logrus.Entry) (bool, error) {
 	return false, nil
 }
 
-func getLatestReleaseInfo(log *logrus.Entry) (*LatestRelease, error) {
-	log.Debug("Downloading latest info")
-	latestResp, err := http.Get(latestURL)
+// GetLatestReleaseInfo download and parse JSON info for latest version from repository
+func GetLatestReleaseInfo(channel string) (*LatestRelease, error) {
+	latestResp, err := http.Get(latestJSONURL(channel))
 	if err != nil {
 		return nil, err
 	}
 
-	log.Debug("Unmarshalling latest release data")
 	latestRelease := new(LatestRelease)
 	latestReleasePayload, _ := ioutil.ReadAll(latestResp.Body)
 	if err = json.Unmarshal(latestReleasePayload, &latestRelease); err != nil {
@@ -125,7 +122,7 @@ func getLatestReleaseInfo(log *logrus.Entry) (*LatestRelease, error) {
 	return latestRelease, nil
 }
 
-func downloadAndUpdate(log *logrus.Entry, latestRelease *LatestRelease) error {
+func downloadAndUpdate(log *logrus.Entry, channel string, latestRelease *LatestRelease) error {
 	log.Info("Downloading update.")
 
 	var versionPath = releaseServer + path.Join(channel, latestRelease.Version, runtime.GOOS)
@@ -176,4 +173,8 @@ func downloadAndUpdate(log *logrus.Entry, latestRelease *LatestRelease) error {
 	}
 	log.Info("Update done.")
 	return nil
+}
+
+func latestJSONURL(channel string) string {
+	return releaseServer + channel + "/latest.json"
 }

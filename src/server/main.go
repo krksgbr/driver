@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"senso"
+	"update"
 )
 
 // build var (-ldflags)
@@ -45,7 +46,7 @@ func Start() {
 	go startMonitor(logrus.WithField("package", "monitor"))
 
 	// Setup driver update loop
-	go startUpdateLoop(logrus.WithField("package", "update"))
+	go update.Start(logrus.WithField("package", "update"), version, channel)
 
 	// Server root
 	rootMsg, _ := json.Marshal(map[string]string{

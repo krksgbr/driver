@@ -2,6 +2,7 @@ all: build
 
 CWD := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 GOPATH := $(CWD)
+CHECK_VERSION_BIN := bin/check-version
 SRC := src/cmd/dividat-driver/main.go
 BIN := dividat-driver
 BUCKET := dist-test.dividat.ch
@@ -14,10 +15,6 @@ else
 endif
 
 COMMIT := $(shell git rev-parse HEAD)
-
-TAG := $(shell git describe --exact-match HEAD 2>/dev/null)
-
-PACKAGE_VERSION := $(shell node -p "require('./package.json').version")
 
 RELEASE_DIR = release/$(VERSION)
 
@@ -54,7 +51,6 @@ $(WINDOWS):
 $(LATEST):
 	echo "{\"version\": \"$(VERSION)\", \"commit\": \"$(COMMIT)\"}" > $@
 
-
 define build-os
 	GOOS=$(1) GOARCH=amd64 GOPATH=$(GOPATH) go build \
 	  -ldflags "-X server.channel=$(CHANNEL) -X server.version=$(VERSION)" \
@@ -76,16 +72,11 @@ define sign-bin
 endef
 
 .PHONY: check-version
-check-version:
-ifeq ($(VERSION),)
-	$(error VERSION parameter required)
-endif
-ifneq ($(VERSION), $(TAG))
-	$(error VERSION ($(VERSION)) and annotated Git tag of HEAD ($(TAG)) must match)
-endif
-ifneq ($(VERSION), $(PACKAGE_VERSION))
-	$(error VERSION ($(VERSION)) and `package.json` version ($(PACKAGE_VERSION)) must match)
-endif
+check-version: $(CHECK_VERSION_BIN)
+	$(CHECK_VERSION_BIN) -channel $(CHANNEL) -version $(VERSION)
+
+$(CHECK_VERSION_BIN):
+	GOPATH=$(GOPATH) go install ./src/cmd/check-version
 
 .PHONY: release
 release: crossbuild $(LATEST)
