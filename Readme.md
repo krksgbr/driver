@@ -43,6 +43,12 @@ Firefox, Safari and Edge not supported as they are not yet properly implementing
 -   Requires a special build of `diviapps`
 -   Change the Senso address in `main.go`
 
+## Tools
+
+-   Senso replay:
+        npm install
+        npm run replay -- tools/rec/simple.dat
+
 ## TODO
 
 -   Senso discovery (<https://github.com/grandcat/zeroconf>)
