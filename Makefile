@@ -28,7 +28,7 @@ deps:
 
 .PHONY: build
 build:
-	GOPATH=$(GOPATH) go build -ldflags "-X server.channel=dev -X server.version=$(shell git describe HEAD)" -v -o bin/dividat-driver $(SRC)
+	GOPATH=$(GOPATH) go build -ldflags "-X server.channel=dev -X server.version=$(shell git describe --always HEAD)" -v -o bin/dividat-driver $(SRC)
 
 crossbuild: check-version $(LINUX) $(DARWIN) $(WINDOWS) $(LATEST)
 
