@@ -6,8 +6,10 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/coreos/go-semver/semver"
+	"github.com/sirupsen/logrus"
 
 	"update"
 )
@@ -32,7 +34,7 @@ func main() {
 	if err != nil {
 		exit("Unable to read HEAD Git tag: " + err.Error())
 	}
-	gitTag := string(rawGitTag)
+	gitTag := strings.TrimSpace(string(rawGitTag))
 
 	if *version != gitTag {
 		exit("Version (" + *version + ") and annotated Git tag of HEAD (" + gitTag + ") must match")
@@ -47,14 +49,15 @@ func main() {
 		exit("Version (" + *version + ") and `package.json` version (" + npmPackage.Version + ") must match")
 	}
 
-	latestRelease, err := update.GetLatestReleaseInfo(*channel)
+	logrus.SetOutput(os.Stdout)
+	latestRelease, err := update.GetLatestReleaseInfo(logrus.New().WithFields(logrus.Fields{}), *channel, true)
 	if err != nil {
 		exit("Unable to fetch latest version: " + err.Error())
 	}
 
-	latestSemVersion, err := semver.NewVersion(latestRelease.Version)
+	latestSemVersion, err := semver.NewVersion(latestRelease)
 	if err != nil {
-		exit("Unable to parse latest version (" + latestRelease.Version + ") as semantic: " + err.Error())
+		exit("Unable to parse latest version (" + latestRelease + ") as semantic: " + err.Error())
 	}
 
 	if !latestSemVersion.LessThan(*semVersion) {

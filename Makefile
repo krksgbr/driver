@@ -21,7 +21,7 @@ RELEASE_DIR = release/$(VERSION)
 LINUX = $(RELEASE_DIR)/linux/$(BIN)-linux-amd64-$(VERSION)
 DARWIN = $(RELEASE_DIR)/darwin/$(BIN)-darwin-amd64-$(VERSION)
 WINDOWS = $(RELEASE_DIR)/win32/$(BIN)-win32-amd64-$(VERSION).exe
-LATEST = release/latest.json
+LATEST = release/latest
 
 deps:
 	cd src && glide install
@@ -35,21 +35,23 @@ crossbuild: check-version $(LINUX) $(DARWIN) $(WINDOWS) $(LATEST)
 $(LINUX):
 	$(call build-os,linux,$@)
 	upx $@
-	$(call write-metadata,$@)
+	$(call write-signature,$@)
 
 $(DARWIN):
 	$(call build-os,darwin,$@)
 	upx $@
-	$(call write-metadata,$@)
+	$(call write-signature,$@)
 
 $(WINDOWS):
 	$(call build-os,windows,$@)
 	upx $@
 	$(call sign-bin,$@)
-	$(call write-metadata,$@)
+	$(call write-signature,$@)
 
+.PHONY: $(LATEST)
 $(LATEST):
-	echo "{\"version\": \"$(VERSION)\", \"commit\": \"$(COMMIT)\"}" > $@
+	echo $(VERSION) > $@ && \
+	openssl dgst -sha256 -sign $(CHECKSUM_SIGNING_CERT) $@ | openssl base64 -A -out $@.sig
 
 define build-os
 	GOOS=$(1) GOARCH=amd64 GOPATH=$(GOPATH) go build \
@@ -57,8 +59,8 @@ define build-os
 		-o $(2) $(SRC)
 endef
 
-define write-metadata
-  ./tools/gen-metadata.sh signingprivatekey.pem $(1) > `dirname $(1)`/metadata.json
+define write-signature
+	openssl dgst -sha256 -sign $(CHECKSUM_SIGNING_CERT) $(1) | openssl base64 -A -out $(1).sig
 endef
 
 define sign-bin
@@ -72,6 +74,7 @@ define sign-bin
 endef
 
 .PHONY: check-version
+
 check-version: $(CHECK_VERSION_BIN)
 	$(CHECK_VERSION_BIN) -channel $(CHANNEL) -version $(VERSION)
 
@@ -82,13 +85,15 @@ $(CHECK_VERSION_BIN):
 release: crossbuild $(LATEST)
 	aws s3 cp $(RELEASE_DIR) s3://$(BUCKET)/releases/driver/$(CHANNEL)/$(VERSION)/ --recursive \
 		--acl public-read \
-		--cache-control max-age=0 \
-		--content-type application/octet-stream
-	aws s3 cp $(LATEST) s3://$(BUCKET)/releases/driver/$(CHANNEL)/latest.json \
+		--cache-control max-age=0
+	aws s3 cp $(LATEST) s3://$(BUCKET)/releases/driver/$(CHANNEL)/latest \
 		--acl public-read \
-		--cache-control max-age=0 \
-		--content-type application/json
+		--cache-control max-age=0
+	aws s3 cp $(LATEST).sig s3://$(BUCKET)/releases/driver/$(CHANNEL)/latest.sig \
+		--acl public-read \
+		--cache-control max-age=0
 
 clean:
 	rm -rf release/
+	rm -f $(CHECK_VERSION_BIN)
 	go clean
