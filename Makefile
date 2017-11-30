@@ -25,6 +25,7 @@ LATEST = release/latest
 
 deps:
 	cd src && glide install
+	npm install
 
 .PHONY: build
 build:

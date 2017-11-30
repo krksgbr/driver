@@ -1,6 +1,6 @@
-# Dividat Drivers
+# Dividat Driver
 
-Dividat drivers and hardware test suites (in Go!).
+Dividat drivers and hardware test suites.
 
 ## Prerequisites
 
@@ -17,9 +17,9 @@ For packaging:
 
 Firefox, Safari and Edge not supported as they are not yet properly implementing _loopback as a trustworthy origin_, see:
 
-- Firefox (tracking): https://bugzilla.mozilla.org/show_bug.cgi?id=1376309
-- Edge: https://developer.microsoft.com/en-us/microsoft-edge/platform/issues/11963735/
-- Safari: https://bugs.webkit.org/show_bug.cgi?id=171934
+-   Firefox (tracking): <https://bugzilla.mozilla.org/show_bug.cgi?id=1376309>
+-   Edge: <https://developer.microsoft.com/en-us/microsoft-edge/platform/issues/11963735/>
+-   Safari: <https://bugs.webkit.org/show_bug.cgi?id=171934>
 
 ## Quick start
 
@@ -28,17 +28,18 @@ Firefox, Safari and Edge not supported as they are not yet properly implementing
 -   In your editor settings, set $GOPATH to repo if needed
 
 -   Install dependencies:
+
         make deps
 
 -   Build and run
+
         make
-        ./release/dividat-driver
+        ./bin/dividat-driver
 
     Or use `go run`:
 
         go run src/cmd/dividat-driver/main.go start
 
-## Notes
 ## Tests
 
 Run the test suite with: `npm test`.
