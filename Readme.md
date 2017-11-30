@@ -45,10 +45,12 @@ Run the test suite with: `npm test`.
 
 ## Tools
 
--   Senso replay:
-        npm install
-        npm run replay -- tools/rec/simple.dat
+### Data replayer
 
-## TODO
+Logged data can be replayed for debugging purposes.
 
--   Senso discovery (<https://github.com/grandcat/zeroconf>)
+For default settings: `npm run replay`
+
+To replay an other recording: `npm run replay -- rec/simple.dat`
+
+To slow down the replay: `npm run replay -- -t 100`
