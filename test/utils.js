@@ -10,7 +10,7 @@ module.exports = {
   },
 
   startDriver: function () {
-    return spawn('release/dividat-driver')
+    return spawn('bin/dividat-driver')
   },
 
   connectWithLog: function () {

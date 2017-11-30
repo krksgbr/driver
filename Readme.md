@@ -39,9 +39,9 @@ Firefox, Safari and Edge not supported as they are not yet properly implementing
         go run src/cmd/dividat-driver/main.go start
 
 ## Notes
+## Tests
 
--   Requires a special build of `diviapps`
--   Change the Senso address in `main.go`
+Run the test suite with: `npm test`.
 
 ## Tools
 
