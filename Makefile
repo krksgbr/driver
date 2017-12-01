@@ -64,6 +64,8 @@ RELEASE_DIR = release/$(CHANNEL)/$(VERSION)
 # Helper to create signature
 define write-signature
 	openssl dgst -sha256 -sign $(CHECKSUM_SIGNING_CERT) $(1) | openssl base64 -A -out $(1).sig
+	# make sure signature file exists and is non-zero
+	test -s $(1).sig
 endef
 
 # write the pointer to the latest release
@@ -108,8 +110,14 @@ release: crossbuild release/$(CHANNEL)/latest
 
 ### Deploy ################################################
 
-deploy: release
-	test $(CHANNEL) = "master" -o $(CHANNEL) = "develop"
+SEMVER_REGEX = ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$
+
+deploy:
+	# Check if on right channel
+	[[ $(CHANNEL) = "master" || $(CHANNEL) = "develop" ]]
+	
+	# Check if version is in semver format
+	[[ $(VERSION) =~ $(SEMVER_REGEX) ]]
 
 	aws s3 cp $(RELEASE_DIR) $(BUCKET)/$(CHANNEL)/$(VERSION)/ --recursive \
 		--acl public-read \
