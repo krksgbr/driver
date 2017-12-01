@@ -1,10 +1,10 @@
-
 ### Release configuration #################################
 # Path to folder in S3 (without slash at end)
 BUCKET := s3://dist-test.dividat.ch/releases/driver2
 
 # where the BUCKET folder is accessible for getting updates
 RELEASE_URL = http://dist-test.dividat.ch.s3.amazonaws.com/releases/driver2/
+
 
 ### Basic setup ###########################################
 # Set GOPATH to repository path
@@ -17,6 +17,7 @@ SRC = ./src/cmd/$(BIN)/main.go
 
 # Get version from git
 VERSION = $(shell git describe --always HEAD)
+
 
 ### Simple build ##########################################
 .PHONY: $(BIN)
@@ -39,19 +40,18 @@ LINUX = $(BIN)-linux-amd64
 .PHONY: $(LINUX)
 $(LINUX):
 	$(call cross-build,linux,bin/$(LINUX))
-#
-# DARWIN = $(BIN)-darwin-amd64
-# .PHONY: $(DARWIN)
-# $(DARWIN):
-# 	$(call cross-build,darwin,bin/$(DARWIN))
+
+DARWIN = $(BIN)-darwin-amd64
+.PHONY: $(DARWIN)
+$(DARWIN):
+	$(call cross-build,darwin,bin/$(DARWIN))
 
 WINDOWS = $(BIN)-windows-amd64
 .PHONY: $(WINDOWS)
 $(WINDOWS):
 	$(call cross-build,windows,bin/$(WINDOWS).exe)
 
-# crossbuild: $(LINUX) $(DARWINS) $(WINDOWS)
-crossbuild: $(LINUX) $(WINDOWS)
+crossbuild: $(LINUX) $(DARWIN) $(WINDOWS)
 
 
 ### Release ###############################################
@@ -89,23 +89,22 @@ release: crossbuild release/$(CHANNEL)/latest
 	$(call write-signature,$(LINUX_RELEASE))
 
 	# Darwin
-	# cp bin/$(DARWIN) $(DARWIN_RELEASE)
-	# upx $(DARWIN_RELEASE)
-	# $(call write-signature,$(DARWIN_RELEASE))
+	cp bin/$(DARWIN) $(DARWIN_RELEASE)
+	upx $(DARWIN_RELEASE)
+	$(call write-signature,$(DARWIN_RELEASE))
 
 	# Windows
 	cp bin/$(WINDOWS).exe $(WINDOWS_RELEASE)
 	upx $(WINDOWS_RELEASE)
 	$(call write-signature,$(WINDOWS_RELEASE))
-	# osslsigncode sign \
-	# 	-pkcs12 $(CODE_SIGNING_CERT) \
-	# 	-h sha1 \
-	# 	-n "Dividat Driver" \
-	# 	-i "https://www.dividat.com/" \
-	# 	-in $(WINDOWS_RELEASE) \
-	# 	-out $(WINDOWS_RELEASE)
-	#
-
+	osslsigncode sign \
+		-pkcs12 $(CODE_SIGNING_CERT) \
+		-h sha1 \
+		-n "Dividat Driver" \
+		-i "https://www.dividat.com/" \
+		-in $(WINDOWS_RELEASE) \
+		-out $(WINDOWS_RELEASE)
+	
 
 ### Deploy ################################################
 
@@ -121,6 +120,7 @@ deploy: release
 	aws s3 cp $(LATEST).sig $(BUCKET)/$(CHANNEL)/latest.sig \
 		--acl public-read \
 		--cache-control max-age=0
+
 
 ### Dependencies and cleanup ##############################
 deps:
