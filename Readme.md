@@ -11,6 +11,7 @@ For packaging:
 
 -   [UPX](https://upx.github.io/)
 -   osslsigncode (macOS: `brew install osslsigncode`)
+-   A recent version of OpenSSL (tested with 1.0.2.m) (macOS: `nix-shell -p openssl`)
 -   AWS CLI (macOS: `brew install awscli`)
 
 ## Compatibility
