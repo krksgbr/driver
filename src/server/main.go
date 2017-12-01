@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"senso"
-
 	"github.com/sirupsen/logrus"
+
+	"senso"
+	"update"
 )
 
-var version = "2.0.0"
+// build var (-ldflags)
+var version string
+var channel string
 
 const serverPort = "8382"
 
@@ -23,7 +26,10 @@ func Start() {
 	logrus.AddHook(logServer)
 	http.Handle("/log", logServer)
 
-	logrus.WithField("version", version).Info("Dividat Driver starting")
+	logrus.WithFields(logrus.Fields{
+		"version": version,
+		"channel": channel,
+	}).Info("Dividat Driver starting")
 
 	// Setup a context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -39,9 +45,13 @@ func Start() {
 	// Start the monitor
 	go startMonitor(logrus.WithField("package", "monitor"))
 
+	// Setup driver update loop
+	go update.Start(logrus.WithField("package", "update"), version, channel)
+
 	// Server root
 	rootMsg, _ := json.Marshal(map[string]string{
 		"message": "Dividat Driver",
+		"channel": channel,
 		"version": version,
 	})
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
