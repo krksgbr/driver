@@ -1,98 +1,131 @@
-all: build
 
-CWD := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
-GOPATH := $(CWD)
-CHECK_VERSION_BIN := bin/check-version
-SRC := src/cmd/dividat-driver/main.go
-BIN := dividat-driver
-BUCKET := dist-test.dividat.ch
+### Release configuration #################################
+# Path to folder in S3 (without slash at end)
+BUCKET := s3://dist-test.dividat.ch/releases/driver2
 
-BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
-ifeq ($(BRANCH), master)
-	CHANNEL = internal
-else
-	CHANNEL = dev
-endif
+# where the BUCKET folder is accessible for getting updates
+RELEASE_URL = http://dist-test.dividat.ch.s3.amazonaws.com/releases/driver2/
 
-COMMIT := $(shell git rev-parse HEAD)
+### Basic setup ###########################################
+# Set GOPATH to repository path
+CWD = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
+GOPATH = $(CWD)
 
-RELEASE_DIR = release/$(VERSION)
+# Main source to build
+BIN = dividat-driver
+SRC = ./src/cmd/$(BIN)/main.go
 
-LINUX = $(RELEASE_DIR)/linux/$(BIN)-linux-amd64-$(VERSION)
-DARWIN = $(RELEASE_DIR)/darwin/$(BIN)-darwin-amd64-$(VERSION)
-WINDOWS = $(RELEASE_DIR)/win32/$(BIN)-win32-amd64-$(VERSION).exe
-LATEST = release/latest
+# Get version from git
+VERSION = $(shell git describe --always HEAD)
 
-deps:
-	cd src && glide install
-	npm install
+### Simple build ##########################################
+.PHONY: $(BIN)
+$(BIN):
+	GOPATH=$(GOPATH) go build \
+	-ldflags "-X server.channel=none -X server.version=$(VERSION) -X update.releaseUrl=$(RELEASE_URL)" \
+	-o bin/$(BIN) $(SRC)
 
-.PHONY: build
-build:
-	GOPATH=$(GOPATH) go build -ldflags "-X server.channel=dev -X server.version=$(shell git describe --always HEAD)" -v -o bin/dividat-driver $(SRC)
 
-crossbuild: check-version $(LINUX) $(DARWIN) $(WINDOWS) $(LATEST)
+### Cross compilation #####################################
 
-$(LINUX):
-	$(call build-os,linux,$@)
-	upx $@
-	$(call write-signature,$@)
-
-$(DARWIN):
-	$(call build-os,darwin,$@)
-	upx $@
-	$(call write-signature,$@)
-
-$(WINDOWS):
-	$(call build-os,windows,$@)
-	upx $@
-	$(call sign-bin,$@)
-	$(call write-signature,$@)
-
-.PHONY: $(LATEST)
-$(LATEST):
-	echo $(VERSION) > $@ && \
-	openssl dgst -sha256 -sign $(CHECKSUM_SIGNING_CERT) $@ | openssl base64 -A -out $@.sig
-
-define build-os
+# helper for cross compilation
+define cross-build
 	GOOS=$(1) GOARCH=amd64 GOPATH=$(GOPATH) go build \
-	  -ldflags "-X server.channel=$(CHANNEL) -X server.version=$(VERSION)" \
+	  -ldflags "-X server.channel=$(CHANNEL) -X server.version=$(VERSION) -X update.releaseUrl=$(RELEASE_URL)" \
 		-o $(2) $(SRC)
 endef
 
+LINUX = $(BIN)-linux-amd64
+.PHONY: $(LINUX)
+$(LINUX):
+	$(call cross-build,linux,bin/$(LINUX))
+#
+# DARWIN = $(BIN)-darwin-amd64
+# .PHONY: $(DARWIN)
+# $(DARWIN):
+# 	$(call cross-build,darwin,bin/$(DARWIN))
+
+WINDOWS = $(BIN)-windows-amd64
+.PHONY: $(WINDOWS)
+$(WINDOWS):
+	$(call cross-build,windows,bin/$(WINDOWS).exe)
+
+# crossbuild: $(LINUX) $(DARWINS) $(WINDOWS)
+crossbuild: $(LINUX) $(WINDOWS)
+
+
+### Release ###############################################
+
+# set the channel name to the branch name
+CHANNEL = $(shell git rev-parse --abbrev-ref HEAD)
+
+RELEASE_DIR = release/$(CHANNEL)/$(VERSION)
+
+# Helper to create signature
 define write-signature
 	openssl dgst -sha256 -sign $(CHECKSUM_SIGNING_CERT) $(1) | openssl base64 -A -out $(1).sig
 endef
 
-define sign-bin
-	osslsigncode sign \
-		-pkcs12 $(CODE_SIGNING_CERT) \
-		-h sha1 \
-		-n "Dividat Driver" \
-		-i "https://www.dividat.com/" \
-		-in $(1) \
-		-out $(1)
-endef
+# write the pointer to the latest release
+LATEST = release/$(CHANNEL)/latest
+.PHONY: $(LATEST)
+$(LATEST):
+	mkdir -p `dirname $(LATEST)`
+	echo $(VERSION) > $@
+	$(call write-signature,$@)
 
-.PHONY: check-version
+LINUX_RELEASE = $(RELEASE_DIR)/$(LINUX)-$(VERSION)
+DARWIN_RELEASE = $(RELEASE_DIR)/$(DARWIN)-$(VERSION)
+WINDOWS_RELEASE = $(RELEASE_DIR)/$(WINDOWS)-$(VERSION).exe
 
-check-version: $(CHECK_VERSION_BIN)
-	$(CHECK_VERSION_BIN) -channel $(CHANNEL) -version $(VERSION)
-
-$(CHECK_VERSION_BIN):
-	GOPATH=$(GOPATH) go install ./src/cmd/check-version
-
+# sign and copy binaries to release folders
 .PHONY: release
-release: crossbuild $(LATEST)
-	aws s3 cp $(RELEASE_DIR) s3://$(BUCKET)/releases/driver/$(CHANNEL)/$(VERSION)/ --recursive \
+release: crossbuild release/$(CHANNEL)/latest
+	mkdir -p $(RELEASE_DIR)
+
+	# Linux
+	cp bin/$(LINUX) $(LINUX_RELEASE)
+	upx $(LINUX_RELEASE)
+	$(call write-signature,$(LINUX_RELEASE))
+
+	# Darwin
+	# cp bin/$(DARWIN) $(DARWIN_RELEASE)
+	# upx $(DARWIN_RELEASE)
+	# $(call write-signature,$(DARWIN_RELEASE))
+
+	# Windows
+	cp bin/$(WINDOWS).exe $(WINDOWS_RELEASE)
+	upx $(WINDOWS_RELEASE)
+	$(call write-signature,$(WINDOWS_RELEASE))
+	# osslsigncode sign \
+	# 	-pkcs12 $(CODE_SIGNING_CERT) \
+	# 	-h sha1 \
+	# 	-n "Dividat Driver" \
+	# 	-i "https://www.dividat.com/" \
+	# 	-in $(WINDOWS_RELEASE) \
+	# 	-out $(WINDOWS_RELEASE)
+	#
+
+
+### Deploy ################################################
+
+deploy: release
+	test $(CHANNEL) = "master" -o $(CHANNEL) = "develop"
+
+	aws s3 cp $(RELEASE_DIR) $(BUCKET)/$(CHANNEL)/$(VERSION)/ --recursive \
 		--acl public-read \
 		--cache-control max-age=0
-	aws s3 cp $(LATEST) s3://$(BUCKET)/releases/driver/$(CHANNEL)/latest \
+	aws s3 cp $(LATEST) $(BUCKET)/$(CHANNEL)/latest \
 		--acl public-read \
 		--cache-control max-age=0
-	aws s3 cp $(LATEST).sig s3://$(BUCKET)/releases/driver/$(CHANNEL)/latest.sig \
+	aws s3 cp $(LATEST).sig $(BUCKET)/$(CHANNEL)/latest.sig \
 		--acl public-read \
 		--cache-control max-age=0
+
+### Dependencies and cleanup ##############################
+deps:
+	cd src && glide install
+	npm install
 
 clean:
 	rm -rf release/

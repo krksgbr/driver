@@ -16,7 +16,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const releaseServer = "http://dist-test.dividat.ch.s3.amazonaws.com/releases/driver/"
+// build var (-ldflags)
+var releaseUrl string
 
 const updateInterval = 60 * time.Second
 
@@ -27,38 +28,35 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8sv+i3PuPlTcB3pPMgO87dtOq/ko
 -----END PUBLIC KEY-----
 `)
 
-var updateTicker *time.Ticker
-var updating = false
-
 // Start watch for a new version, then download and swap binary
 func Start(baseLog *logrus.Entry, version string, channel string) {
+
 	log := baseLog.WithFields(logrus.Fields{
-		"version":   version,
-		"channel":   channel,
-		"latestURL": latestJSONURL(channel),
+		"version":    version,
+		"channel":    channel,
+		"releaseUrl": releaseUrl,
 	})
-	updateTicker = time.NewTicker(updateInterval)
-	loop := func() {
-		if updating {
-			return
-		}
-		updating = true
+
+	// Check for updates immediately at startup
+	updated, err := doUpdateLoop(log, version, channel)
+	if err != nil {
+		log.Error(err)
+	}
+	if updated {
+		return
+	}
+
+	// Start a ticker to check for updates
+	updateTicker := time.NewTicker(updateInterval)
+	for range updateTicker.C {
+
 		updated, err := doUpdateLoop(log, version, channel)
+
 		if err != nil {
 			log.Error(err)
 		}
 		if updated {
 			updateTicker.Stop()
-		}
-		updating = false
-	}
-
-	loop()
-
-	for {
-		select {
-		case <-updateTicker.C:
-			loop()
 		}
 	}
 }
@@ -98,7 +96,7 @@ func doUpdateLoop(log *logrus.Entry, version string, channel string) (bool, erro
 
 // GetLatestReleaseInfo download and parse JSON info for latest version from repository
 func GetLatestReleaseInfo(log *logrus.Entry, channel string, checkSignature bool) (string, error) {
-	url := latestJSONURL(channel)
+	url := latestUrl(channel)
 
 	log.Debug("Downloading latest")
 	latestResp, err := http.Get(url)
@@ -152,7 +150,7 @@ func GetLatestReleaseInfo(log *logrus.Entry, channel string, checkSignature bool
 func downloadAndUpdate(log *logrus.Entry, channel string, latestRelease string) error {
 	log.Info("Downloading update.")
 
-	var versionPath = releaseServer + path.Join(channel, latestRelease, runtime.GOOS)
+	var versionPath = releaseUrl + path.Join(channel, latestRelease, runtime.GOOS)
 	var filename = "dividat-driver-" + runtime.GOOS + "-" + runtime.GOARCH + "-" + latestRelease
 	var binURL = versionPath + "/" + filename
 	var sigURL = binURL + ".sig"
@@ -202,8 +200,8 @@ func downloadAndUpdate(log *logrus.Entry, channel string, latestRelease string) 
 	return nil
 }
 
-func latestJSONURL(channel string) string {
-	return releaseServer + channel + "/latest"
+func latestUrl(channel string) string {
+	return releaseUrl + channel + "/latest"
 }
 
 // taken from https://github.com/inconshreveable/go-update/blob/master/apply.go#L307-L322
