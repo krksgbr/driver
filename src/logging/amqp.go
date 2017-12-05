@@ -10,9 +10,9 @@ import (
 )
 
 type AMQPHook struct {
-	levels []logrus.Level
-
 	entries chan *logrus.Entry
+
+	Level logrus.Level
 }
 
 const amqpUrl = "amqp://localhost/"
@@ -20,10 +20,11 @@ const amqpUrl = "amqp://localhost/"
 func NewAMQPHook() *AMQPHook {
 	hook := AMQPHook{}
 
-	hook.levels = []logrus.Level{logrus.InfoLevel}
-
 	// buffer 20 log entries before dropping them
 	hook.entries = make(chan *logrus.Entry, 20)
+
+	// set default level to Info
+	hook.Level = logrus.InfoLevel
 
 	go func() {
 
@@ -84,7 +85,13 @@ func publish(channel *amqp.Channel, entries chan *logrus.Entry) error {
 }
 
 func (hook *AMQPHook) Levels() []logrus.Level {
-	return hook.levels
+	levels := []logrus.Level{}
+	for _, level := range logrus.AllLevels {
+		if level <= hook.Level {
+			levels = append(levels, level)
+		}
+	}
+	return levels
 }
 
 func (hook *AMQPHook) Fire(entry *logrus.Entry) error {
