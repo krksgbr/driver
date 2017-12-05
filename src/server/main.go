@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"logging"
 	"senso"
 	"update"
 )
@@ -22,8 +23,9 @@ func Start() {
 
 	// Set up logging
 	logrus.SetLevel(logrus.DebugLevel)
-	logServer := NewLogServer()
+	logServer := logging.NewLogServer()
 	logrus.AddHook(logServer)
+	logrus.AddHook(logging.NewAMQPHook())
 	http.Handle("/log", logServer)
 
 	logrus.WithFields(logrus.Fields{
