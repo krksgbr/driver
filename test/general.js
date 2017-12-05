@@ -1,6 +1,6 @@
 /* eslint-env mocha */
 
-const { wait, connectWithLog, startDriver } = require('./utils')
+const { wait, getLogs, startDriver } = require('./utils')
 const rp = require('request-promise')
 const expect = require('chai').expect
 
@@ -36,22 +36,8 @@ it('Opening a second instance of the driver fails.', (done) => {
   })
 })
 
-it('Connect to log WebSocket endpoint and receive log entry.', async () => {
-  const log = await connectWithLog()
-
-  const receiveLogEntry = new Promise((resolve, reject) => {
-    log.on('message', (s) => {
-      var msg = JSON.parse(s)
-      if (msg.package === 'monitor') {
-        expect(msg).to.have.property('routines')
-        expect(msg).to.have.property('sysMem')
-        resolve()
-      }
-    })
-  })
-
-  // Cause a log entry
-  driver.kill('SIGUSR1')
-
-  return receiveLogEntry
+it('Get log entries from HTTP endpoint.', async () => {
+  const logs = await getLogs()
+  expect(logs).to.be.an('array')
+  expect(logs[0]).to.include({level: 'info', msg: 'Dividat Driver starting'})
 })

@@ -1,46 +1,48 @@
 package server
 
 import (
-	"container/list"
+	"bytes"
+	"container/ring"
 	"fmt"
+	"io"
 	"net/http"
+	"sync"
 
-	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 )
 
+// Size of buffer for incoming log channel.
+const incomingChannelBufferSize = 5
+
+// Number of log entries to keep in circular buffer
+const bufferSize = 100
+
 // LogServer implements logrus.Hook and http.Handler interfaces
 type LogServer struct {
-	channel chan *logrus.Entry
-	entries *list.List
+	incoming chan *logrus.Entry
 
-	listeners *list.List
+	buffer *ring.Ring
+	mutex  *sync.RWMutex
 }
 
 // NewLogServer returns a new LogServer
 func NewLogServer() *LogServer {
 	logServer := LogServer{}
 
-	logServer.channel = make(chan *logrus.Entry, 5)
-	logServer.entries = list.New()
+	logServer.incoming = make(chan *logrus.Entry, incomingChannelBufferSize)
 
-	logServer.listeners = list.New()
+	// set up log buffer and RWMutex
+	logServer.buffer = ring.New(bufferSize)
+	logServer.mutex = &sync.RWMutex{}
 
 	// start a goroutine handling incoming log entries
 	go func() {
-		for entry := range logServer.channel {
-			// add to log
-			logServer.entries.PushFront(entry)
-
-			for listenerElement := logServer.listeners.Front(); listenerElement != nil; listenerElement = listenerElement.Next() {
-				listener, ok := listenerElement.Value.(chan *logrus.Entry)
-
-				if !ok {
-					continue
-				}
-
-				listener <- entry
-			}
+		for entry := range logServer.incoming {
+			logServer.mutex.Lock()
+			logServer.buffer.Value = entry
+			// Point to next value. For readers the buffer always points to the oldest log entry.
+			logServer.buffer = logServer.buffer.Next()
+			logServer.mutex.Unlock()
 		}
 	}()
 
@@ -56,7 +58,7 @@ func (logServer *LogServer) Levels() []logrus.Level {
 func (logServer *LogServer) Fire(entry *logrus.Entry) error {
 	// TODO: handle multiple receivers
 	select {
-	case logServer.channel <- entry:
+	case logServer.incoming <- entry:
 	default:
 		fmt.Println("ERROR[LogServer]: Could not handle log entry.")
 		fmt.Println(entry.String())
@@ -64,41 +66,43 @@ func (logServer *LogServer) Fire(entry *logrus.Entry) error {
 	return nil
 }
 
-var webSocketUpgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+// Use UTC in as timestamp (from https://stackoverflow.com/a/40502637)
+type UTCFormatter struct {
+	logrus.Formatter
 }
 
-var jsonFormatter = logrus.JSONFormatter{}
+func (u UTCFormatter) Format(e *logrus.Entry) ([]byte, error) {
+	e.Time = e.Time.UTC()
+	return u.Formatter.Format(e)
+}
+
+var formatter = UTCFormatter{&logrus.JSONFormatter{}}
 
 // Implement net/http Handler interface
 func (logServer *LogServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Update to WebSocket
-	conn, err := webSocketUpgrader.Upgrade(w, r, nil)
-	if err != nil {
-		logrus.WithError(err).Error("websocket upgrade error")
-		http.Error(w, "WebSocket upgrade error", http.StatusBadRequest)
-		return
-	}
+	logServer.mutex.RLock()
+	defer logServer.mutex.RUnlock()
 
-	// Set up as listener so live log entries are received here and forwarded via WebSocket
-	entries := make(chan *logrus.Entry)
-	listenerElement := logServer.listeners.PushFront(entries)
-	defer logServer.listeners.Remove(listenerElement)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8") // normal header
 
-	for entry := range entries {
+	// first collect entries in slice so that we can intersperse with ",". See also: https://www.happyassassin.net/2017/09/07/a-modest-proposal/
+	entries := make([][]byte, 0, bufferSize)
 
-		encoded, encodeErr := jsonFormatter.Format(entry)
-		if encodeErr != nil {
-			continue
-		}
-
-		writeErr := conn.WriteMessage(websocket.TextMessage, encoded)
-		if writeErr != nil {
+	logServer.buffer.Do(func(i interface{}) {
+		entry, ok := i.(*logrus.Entry)
+		if !ok {
 			return
 		}
-	}
+
+		encoded, encodeErr := formatter.Format(entry)
+		if encodeErr != nil {
+			return
+		}
+		entries = append(entries, encoded)
+	})
+
+	io.WriteString(w, "[")
+	w.Write(bytes.Join(entries, []byte(",")))
+	io.WriteString(w, "]")
+
 }

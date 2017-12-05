@@ -1,5 +1,5 @@
 /* eslint-env mocha */
-const { wait, connectWithLog, startDriver, expectEvent } = require('../utils')
+const { wait, startDriver, expectEvent } = require('../utils')
 const expect = require('chai').expect
 const WebSocket = require('ws')
 const Promise = require('bluebird')
@@ -31,7 +31,6 @@ function getConnection (server) {
 describe('Basic functionality', () => {
   var driver
   var senso = {}
-  var log
 
   beforeEach(async () => {
   // Start driver
@@ -43,9 +42,6 @@ describe('Basic functionality', () => {
     await wait(500)
     expect(code).to.be.equal(0)
     driver.removeAllListeners()
-
-  // connect to log
-    log = await connectWithLog()
 
   // start a mock Senso
     senso.data = mock.dataChannel()
@@ -60,7 +56,7 @@ describe('Basic functionality', () => {
   })
 
 // Sends a command to Driver (over WS) to connect with the mock senso
-  function connectWithMockSenso (ws) {
+  async function connectWithMockSenso (ws) {
     const cmd = JSON.stringify({
       type: 'Connect',
       address: '127.0.0.1'
@@ -68,34 +64,12 @@ describe('Basic functionality', () => {
 
     ws.send(cmd)
 
-    return expectEvent(log, 'message', (s) => {
-      const entry = JSON.parse(s)
-      expect(entry.package).to.be.equal('senso')
-      expect(entry.channel).to.be.equal('data')
-      expect(entry.msg).to.be.equal('connected')
-      return true
-    }).then(() => {
-      return ws
-    })
+    // Wait a bit until connection is opened
+    // TODO: check for logs when connection is opened
+    await wait(500)
+
+    return ws
   }
-
-  it('Can connect to Senso WebSocket endpoint.', async () => {
-    const log = await connectWithLog()
-
-    const receiveLogEntry = new Promise((resolve, reject) => {
-      log.on('message', (s) => {
-        const entry = JSON.parse(s)
-        if (entry.package === 'senso') {
-          expect(entry.msg).to.be.equal('WebSocket connection opened')
-          resolve()
-        }
-      }).on('error', reject)
-    })
-
-    await connectSensoWS()
-
-    return receiveLogEntry
-  })
 
   it('Can connect to a mock Senso.', async function () {
   // disable mocha timeout
