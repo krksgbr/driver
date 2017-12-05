@@ -29,8 +29,8 @@ func Start() {
 	http.Handle("/log", logServer)
 
 	baseLog := logrus.WithFields(logrus.Fields{
-		"version": version,
-		"channel": channel,
+		"version":        version,
+		"releaseChannel": channel,
 	})
 	baseLog.Info("Dividat Driver starting")
 
@@ -64,6 +64,6 @@ func Start() {
 	})
 
 	// Start the server
-	log.WithField("port", serverPort).Info("starting http server")
+	log.WithField("port", serverPort).Info("Starting HTTP server.")
 	log.Panic(http.ListenAndServe(":"+serverPort, nil))
 }
