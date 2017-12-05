@@ -51,7 +51,7 @@ func (handle *Handle) Connect(address string) {
 	handle.log.WithField("address", address).Info("Attempting to connect with Senso.")
 
 	go connectTCP(ctx, handle.log.WithField("channel", "data"), address+":55568", handle.Data)
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 	go connectTCP(ctx, handle.log.WithField("channel", "control"), address+":55567", handle.Control)
 
 	handle.cancelCurrentConnection = cancel
