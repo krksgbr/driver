@@ -39,7 +39,7 @@ func Start() {
 	defer cancel()
 
 	// Setup Senso
-	sensoHandle := senso.New(ctx, logrus.WithField("package", "senso"))
+	sensoHandle := senso.New(ctx, baseLog.WithField("package", "senso"))
 	http.Handle("/senso", sensoHandle)
 
 	// Create a logger for server
