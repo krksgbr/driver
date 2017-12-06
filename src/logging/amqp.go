@@ -15,7 +15,7 @@ type AMQPHook struct {
 	Level logrus.Level
 }
 
-const amqpUrl = "amqp://localhost/"
+const amqpUrl = "amqps://driver:driver@logs.dividat.com/"
 
 func NewAMQPHook() *AMQPHook {
 	hook := AMQPHook{}
@@ -75,6 +75,7 @@ func publish(channel *amqp.Channel, entries chan *logrus.Entry) error {
 			Body:        encoded,
 		}
 
+		// publish to the "driver" exchange
 		err := channel.Publish("driver", "", false, false, msg)
 		if err != nil {
 			return err
