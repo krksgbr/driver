@@ -144,7 +144,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Update to WebSocket
 	conn, err := webSocketUpgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.WithError(err).Error("websocket upgrade error")
+		log.WithError(err).Error("Could not upgrade connection to WebSocket.")
 		http.Error(w, "WebSocket upgrade error", http.StatusBadRequest)
 		return
 	}
@@ -189,7 +189,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if messageType == websocket.BinaryMessage {
-				log.WithField("data", msg).Debug("forwarding data to control port")
+				log.WithField("data", msg).Debug("Forwarding data to control port.")
 				select {
 				case handle.Control <- msg:
 				default:
@@ -200,11 +200,11 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				var command Command
 				decodeErr := json.Unmarshal(msg, &command)
 				if decodeErr != nil {
-					log.WithField("rawCommand", msg).WithError(decodeErr).Warning("can not decode command")
+					log.WithField("rawCommand", msg).WithError(decodeErr).Warning("Can not decode command.")
 					continue
 				}
 
-				log.WithField("command", prettyPrintCommand(command)).Debug("received command")
+				log.WithField("command", prettyPrintCommand(command)).Debug("Received command.")
 
 				if command.GetStatus != nil {
 
@@ -218,7 +218,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					writeMutex.Unlock()
 
 					if writeErr != nil {
-						log.WithError(writeErr).Error("could not send Status message to websocket client")
+						log.WithError(writeErr).Error("WebSocket write error.")
 						continue
 					}
 
@@ -237,7 +237,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 					go func(entries chan *zeroconf.ServiceEntry) {
 						for entry := range entries {
-							log.WithField("service", entry).Debug("discovered service")
+							log.WithField("service", entry).Debug("Discovered service.")
 
 							var message Message
 							message.Discovered = entry
@@ -248,11 +248,11 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							writeMutex.Unlock()
 
 							if writeErr != nil {
-								log.WithError(writeErr).Error("could not send Discovered message to websocket client")
+								log.WithError(writeErr).Error("WebSocket write error.")
 							}
 
 						}
-						log.Debug("discovery finished")
+						log.Debug("Discovery finished.")
 					}(entries)
 
 				}

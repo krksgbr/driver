@@ -48,10 +48,10 @@ func (handle *Handle) Connect(address string) {
 	// Create a child context for a new connection. This allows an individual connection (attempt) to be cancelled without restarting the whole Senso handler
 	ctx, cancel := context.WithCancel(handle.ctx)
 
-	handle.log.WithField("address", address).Info("attempting to connect with Senso")
+	handle.log.WithField("address", address).Info("Attempting to connect with Senso.")
 
 	go connectTCP(ctx, handle.log.WithField("channel", "data"), address+":55568", handle.Data)
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 	go connectTCP(ctx, handle.log.WithField("channel", "control"), address+":55567", handle.Control)
 
 	handle.cancelCurrentConnection = cancel
@@ -60,7 +60,7 @@ func (handle *Handle) Connect(address string) {
 // Disconnect from current connection
 func (handle *Handle) Disconnect() {
 	if handle.cancelCurrentConnection != nil {
-		handle.log.Info("disconnecting from Senso")
+		handle.log.Info("Disconnecting from Senso.")
 		handle.cancelCurrentConnection()
 		handle.Address = nil
 	}

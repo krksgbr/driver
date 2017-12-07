@@ -29,18 +29,12 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8sv+i3PuPlTcB3pPMgO87dtOq/ko
 `)
 
 // Start watch for a new version, then download and swap binary
-func Start(baseLog *logrus.Entry, version string, channel string) {
-
-	log := baseLog.WithFields(logrus.Fields{
-		"version":    version,
-		"channel":    channel,
-		"releaseUrl": releaseUrl,
-	})
+func Start(log *logrus.Entry, version string, channel string) {
 
 	// Check for updates immediately at startup
 	updated, err := doUpdateLoop(log, version, channel)
 	if err != nil {
-		log.Error(err)
+		log.WithError(err).Error("Update mechanism failed.")
 	}
 	if updated {
 		return
@@ -53,7 +47,7 @@ func Start(baseLog *logrus.Entry, version string, channel string) {
 		updated, err := doUpdateLoop(log, version, channel)
 
 		if err != nil {
-			log.Error(err)
+			log.WithError(err).Error("Update mechanism failed.")
 		}
 		if updated {
 			updateTicker.Stop()
@@ -62,13 +56,12 @@ func Start(baseLog *logrus.Entry, version string, channel string) {
 }
 
 func doUpdateLoop(log *logrus.Entry, version string, channel string) (bool, error) {
-	log.Info("Checking if udpate is needed...")
+	log.WithField("url", releaseUrl).Info("Checking for update.")
 
 	latestRelease, err := GetLatestReleaseInfo(log, channel, true)
 	if err != nil {
 		return false, err
 	}
-	log = log.WithField("newVersion", latestRelease)
 
 	latestSemVersion, err := semver.NewVersion(latestRelease)
 	if err != nil {
@@ -81,7 +74,7 @@ func doUpdateLoop(log *logrus.Entry, version string, channel string) (bool, erro
 	}
 
 	if currentSemVersion.LessThan(*latestSemVersion) {
-		log.Info("Newer version discovered.")
+		log.WithField("newVersion", latestRelease).Info("Newer version discovered.")
 		err = downloadAndUpdate(log, channel, latestRelease)
 		if err != nil {
 			return false, err
@@ -90,7 +83,7 @@ func doUpdateLoop(log *logrus.Entry, version string, channel string) (bool, erro
 		return true, nil
 	}
 
-	log.Info("Current version is latest.")
+	log.Info("Current version is latest. No updated needed.")
 	return false, nil
 }
 
@@ -98,7 +91,7 @@ func doUpdateLoop(log *logrus.Entry, version string, channel string) (bool, erro
 func GetLatestReleaseInfo(log *logrus.Entry, channel string, checkSignature bool) (string, error) {
 	url := latestUrl(channel)
 
-	log.Debug("Downloading latest")
+	log.Debug("Downloading new version.")
 	latestResp, err := http.Get(url)
 	if err != nil {
 		return "", err

@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"logging"
 	"senso"
 	"update"
 )
@@ -22,31 +23,33 @@ func Start() {
 
 	// Set up logging
 	logrus.SetLevel(logrus.DebugLevel)
-	logServer := NewLogServer()
+	logServer := logging.NewLogServer()
 	logrus.AddHook(logServer)
+	logrus.AddHook(logging.NewAMQPHook())
 	http.Handle("/log", logServer)
 
-	logrus.WithFields(logrus.Fields{
-		"version": version,
-		"channel": channel,
-	}).Info("Dividat Driver starting")
+	baseLog := logrus.WithFields(logrus.Fields{
+		"version":        version,
+		"releaseChannel": channel,
+	})
+	baseLog.Info("Dividat Driver starting")
 
 	// Setup a context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Setup Senso
-	sensoHandle := senso.New(ctx, logrus.WithField("package", "senso"))
+	sensoHandle := senso.New(ctx, baseLog.WithField("package", "senso"))
 	http.Handle("/senso", sensoHandle)
 
 	// Create a logger for server
-	log := logrus.WithField("package", "server")
+	log := baseLog.WithField("package", "server")
 
 	// Start the monitor
-	go startMonitor(logrus.WithField("package", "monitor"))
+	go startMonitor(baseLog.WithField("package", "monitor"))
 
 	// Setup driver update loop
-	go update.Start(logrus.WithField("package", "update"), version, channel)
+	go update.Start(baseLog.WithField("package", "update"), version, channel)
 
 	// Server root
 	rootMsg, _ := json.Marshal(map[string]string{
@@ -61,6 +64,6 @@ func Start() {
 	})
 
 	// Start the server
-	log.WithField("port", serverPort).Info("starting http server")
+	log.WithField("port", serverPort).Info("Starting HTTP server.")
 	log.Panic(http.ListenAndServe(":"+serverPort, nil))
 }

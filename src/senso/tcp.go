@@ -14,9 +14,6 @@ import (
 // How long to wait before timeing out a tcp connection attempt
 const dialTimeout = 5 * time.Second
 
-// never stop retrying to connect
-const maxElapsedTime = 0
-
 // maximal interval to wait between connection retry
 const maxInterval = 30 * time.Second
 
@@ -28,35 +25,42 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 
 	var conn net.Conn
 	dialTCP := func() error {
-		// attempt to open a new connection
+
 		dialer.Deadline = time.Now().Add(dialTimeout)
 		var connErr error
-		log.Info("dialing")
 		if conn != nil {
 			conn.Close()
 		}
 
+		log.Info("Dialing TCP connection.")
 		conn, connErr = dialer.DialContext(ctx, "tcp", address)
+
 		if connErr != nil {
-			log.WithError(connErr).Info("Dial error")
+			log.WithError(connErr).Info("Could not connect with Senso.")
 		}
 		return connErr
 	}
 
-	var backOffStrategy = backoff.NewExponentialBackOff()
-
+	// Exponential backoff
+	var expBackoff = backoff.NewExponentialBackOff()
 	// Never stop retrying
-	backOffStrategy.MaxElapsedTime = maxElapsedTime
-
+	expBackoff.MaxElapsedTime = 0
 	// Set maximum interval to 30s
-	backOffStrategy.MaxInterval = maxInterval
+	expBackoff.MaxInterval = maxInterval
+
+	var backOffStrategy = backoff.WithContext(expBackoff, ctx)
 
 	for true {
 
 		backOffStrategy.Reset()
 		backoff.Retry(dialTCP, backOffStrategy)
 
-		log.Info("connected")
+		// connection/ctx has been cancelled
+		if conn == nil {
+			return
+		}
+
+		log.Info("Connected.")
 
 		// Close connection if we break or return
 		defer conn.Close()
@@ -96,21 +100,12 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 
 			case writeError := <-writeErrors:
 				if err, ok := writeError.(net.Error); ok && err.Timeout() {
-					log.Debug("timeout on write")
+					log.Debug("Timeout while writing.")
 				} else {
-					log.WithError(writeError).Error("write error")
+					log.WithError(writeError).Error("Write error.")
 					disconnected = true
 				}
 			}
-		}
-
-		// Check if connection has been cancelled
-		select {
-		case <-ctx.Done():
-			return
-
-		default:
-			log.Debug("reconnecting")
 		}
 
 	}
@@ -125,18 +120,17 @@ func tcpReader(log *logrus.Entry, conn net.Conn, channel chan<- []byte) {
 
 	// Loop and read from connection.
 	for {
-		// conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 		readN, readErr := conn.Read(buffer)
 
 		if readErr != nil {
 			if readErr == io.EOF {
 				// connection is closed
-				log.Info("connection closed")
+				log.Info("Connection closed by Senso.")
 				return
 			} else if err, ok := readErr.(net.Error); ok && err.Timeout() {
 				// Read timeout, just continue Nothing
 			} else {
-				log.WithError(readErr).Error("read error")
+				log.WithError(readErr).Error("Read error.")
 				return
 			}
 		} else {
@@ -162,7 +156,7 @@ func tcpWriter(conn net.Conn, channel <-chan []byte, errorChannel chan<- error) 
 				}
 
 			} else {
-				errorChannel <- errors.New("not connected, can not write to TCP connection")
+				errorChannel <- errors.New("Can not write to TCP connection, because not connected.")
 			}
 
 		} else {

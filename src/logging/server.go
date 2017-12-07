@@ -1,9 +1,9 @@
-package server
+package logging
 
 import (
 	"bytes"
 	"container/ring"
-	"fmt"
+	"errors"
 	"io"
 	"net/http"
 	"sync"
@@ -56,14 +56,12 @@ func (logServer *LogServer) Levels() []logrus.Level {
 
 // Fire implements the logrus.Hook interface
 func (logServer *LogServer) Fire(entry *logrus.Entry) error {
-	// TODO: handle multiple receivers
 	select {
 	case logServer.incoming <- entry:
+		return nil
 	default:
-		fmt.Println("ERROR[LogServer]: Could not handle log entry.")
-		fmt.Println(entry.String())
+		return errors.New("LogServer not accepting entries into buffer, dropping entry.")
 	}
-	return nil
 }
 
 // Use UTC in as timestamp (from https://stackoverflow.com/a/40502637)
