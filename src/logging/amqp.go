@@ -15,7 +15,7 @@ type AMQPHook struct {
 	Level logrus.Level
 }
 
-const amqpUrl = "amqps://driver:driver@logs.dividat.com/"
+const amqpUrl = "amqps://driver:driver@log.dividat.com/"
 
 func NewAMQPHook() *AMQPHook {
 	hook := AMQPHook{}
