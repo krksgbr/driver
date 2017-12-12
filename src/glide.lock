@@ -1,5 +1,5 @@
-hash: 5ab9fab2c8d70bf752fbad94d617f8c0ec848be2da153bd5b025613a92d09b59
-updated: 2017-11-24T15:44:35.201166641+01:00
+hash: 820ff1d6078d6700cf3d20208ac3eabea65c0a867fc7d539ec015ec23ab518e9
+updated: 2017-12-12T11:28:38.495111812+01:00
 imports:
 - name: github.com/cenkalti/backoff
   version: 61153c768f31ee5f130071d08fc82b85208528de
@@ -7,6 +7,8 @@ imports:
   version: 1817cd4bea52af76542157eeabd74b057d1a199e
   subpackages:
   - semver
+- name: github.com/denisbrodbeck/machineid
+  version: e59b4a9b1b28de48436e47104472050658bacfcf
 - name: github.com/gorilla/websocket
   version: ea4d1f681babbce9545c9c5f3d5194a789c89f5b
 - name: github.com/grandcat/zeroconf
@@ -25,7 +27,9 @@ imports:
   subpackages:
   - internal/socket
 - name: github.com/sirupsen/logrus
-  version: f006c2ac4710855cf0f916dd6b77acf6b048dc6e
+  version: d682213848ed68c0a260ca37d6dd5ace8423f5ba
+- name: github.com/streadway/amqp
+  version: ff34ec9cc65c2a23db5126d962c431018f65af59
 - name: golang.org/x/crypto
   version: 2509b142fb2b797aa7587dad548f113b2c0f20ce
   subpackages:

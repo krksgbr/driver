@@ -23,15 +23,30 @@ func Start() {
 
 	// Set up logging
 	logrus.SetLevel(logrus.DebugLevel)
+
 	logServer := logging.NewLogServer()
 	logrus.AddHook(logServer)
-	logrus.AddHook(logging.NewAMQPHook())
 	http.Handle("/log", logServer)
+
+	logrus.AddHook(logging.NewAMQPHook())
 
 	baseLog := logrus.WithFields(logrus.Fields{
 		"version":        version,
 		"releaseChannel": channel,
 	})
+
+	// Get System information
+	systemInfo, err := GetSystemInfo()
+	if err != nil {
+		baseLog.WithError(err).Panic("Could not get system information.")
+	}
+
+	baseLog = baseLog.WithFields(logrus.Fields{
+		"machineId": systemInfo.MachineId,
+		"os":        systemInfo.Os,
+		"arch":      systemInfo.Arch,
+	})
+
 	baseLog.Info("Dividat Driver starting")
 
 	// Setup a context
@@ -53,9 +68,12 @@ func Start() {
 
 	// Server root
 	rootMsg, _ := json.Marshal(map[string]string{
-		"message": "Dividat Driver",
-		"channel": channel,
-		"version": version,
+		"message":   "Dividat Driver",
+		"channel":   channel,
+		"version":   version,
+		"machineId": systemInfo.MachineId,
+		"os":        systemInfo.Os,
+		"arch":      systemInfo.Arch,
 	})
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")

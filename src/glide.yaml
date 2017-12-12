@@ -14,3 +14,4 @@ import:
 - package: github.com/grandcat/zeroconf
 - package: github.com/cenkalti/backoff
   version: ~1.1.0
+- package: github.com/denisbrodbeck/machineid
