@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
-	"path"
 	"runtime"
 	"strings"
 	"time"
@@ -23,8 +22,8 @@ const updateInterval = 6 * time.Hour
 
 var rawPublicKey = []byte(`
 -----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8sv+i3PuPlTcB3pPMgO87dtOq/ko
-2JsEBT+baM7jI+PWkFqpxnoziWF9SL0FU8euKNpxkowztWrmAqXgLZ5NPg==
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAELNhr0Q/CdCSKpFWPHQId9XmytCz1
+BNBcDMwHh8O5ZRvdW1Sh9t7tYDIZBW1b4/JNBOoRnjf6N5rTAT95rW7TAg==
 -----END PUBLIC KEY-----
 `)
 
@@ -58,7 +57,7 @@ func Start(log *logrus.Entry, version string, channel string) {
 func doUpdateLoop(log *logrus.Entry, version string, channel string) (bool, error) {
 	log.WithField("url", releaseUrl).Info("Checking for update.")
 
-	latestRelease, err := GetLatestReleaseInfo(log, channel, true)
+	latestRelease, err := GetLatestReleaseInfo(log, channel)
 	if err != nil {
 		return false, err
 	}
@@ -74,7 +73,8 @@ func doUpdateLoop(log *logrus.Entry, version string, channel string) (bool, erro
 	}
 
 	if currentSemVersion.LessThan(*latestSemVersion) {
-		log.WithField("newVersion", latestRelease).Info("Newer version discovered.")
+		log := log.WithField("newVersion", latestRelease)
+		log.Info("Newer version discovered.")
 		err = downloadAndUpdate(log, channel, latestRelease)
 		if err != nil {
 			return false, err
@@ -88,10 +88,10 @@ func doUpdateLoop(log *logrus.Entry, version string, channel string) (bool, erro
 }
 
 // GetLatestReleaseInfo download and parse JSON info for latest version from repository
-func GetLatestReleaseInfo(log *logrus.Entry, channel string, checkSignature bool) (string, error) {
+func GetLatestReleaseInfo(log *logrus.Entry, channel string) (string, error) {
 	url := latestUrl(channel)
 
-	log.Debug("Downloading new version.")
+	log.WithField("url", url).Debug("Getting latest release information.")
 	latestResp, err := http.Get(url)
 	if err != nil {
 		return "", err
@@ -102,51 +102,36 @@ func GetLatestReleaseInfo(log *logrus.Entry, channel string, checkSignature bool
 		return "", err
 	}
 
-	if checkSignature {
-		log.Debug("Downloading latest.sig")
-		sigResp, err := http.Get(url + ".sig")
-		if err != nil {
-			return "", err
-		}
+	signature, err := getSignature(url)
+	if err != nil {
+		return "", err
+	}
 
-		sigPayload, err := ioutil.ReadAll(sigResp.Body)
-		if err != nil {
-			return "", err
-		}
+	log.Debug("Verifying latest.sig")
+	// reusing go-update sig check features
+	opts := update.Options{
+		Signature: signature,
+		Hash:      crypto.SHA256,
+		Verifier:  update.NewECDSAVerifier(),
+	}
+	err = opts.SetPublicKeyPEM(rawPublicKey)
+	if err != nil {
+		return "", err
+	}
 
-		sig, err := base64.StdEncoding.DecodeString(string(sigPayload))
-		if err != nil {
-			return "", err
-		}
-
-		log.Debug("Verifying latest.sig")
-		// reusing go-update sig check features
-		opts := update.Options{
-			Signature: sig,
-			Hash:      crypto.SHA256,
-			Verifier:  update.NewECDSAVerifier(),
-		}
-		err = opts.SetPublicKeyPEM(rawPublicKey)
-		if err != nil {
-			return "", err
-		}
-
-		err = verifySignature(opts, latestReleasePayload)
-		if err != nil {
-			return "", err
-		}
+	err = verifySignature(opts, latestReleasePayload)
+	if err != nil {
+		return "", err
 	}
 
 	return strings.TrimSpace(string(latestReleasePayload)), nil
 }
 
 func downloadAndUpdate(log *logrus.Entry, channel string, latestRelease string) error {
-	log.Info("Downloading update.")
+	log.Info("Downloading and applying update.")
 
-	var versionPath = releaseUrl + path.Join(channel, latestRelease, runtime.GOOS)
 	var filename = "dividat-driver-" + runtime.GOOS + "-" + runtime.GOARCH + "-" + latestRelease
-	var binURL = versionPath + "/" + filename
-	var sigURL = binURL + ".sig"
+	var binURL = releaseUrl + channel + "/" + latestRelease + "/" + filename
 	var err error
 
 	log.Debug("Downloading new release from " + binURL)
@@ -155,20 +140,7 @@ func downloadAndUpdate(log *logrus.Entry, channel string, latestRelease string) 
 		return err
 	}
 
-	log.Debug("Downloading sig file from " + sigURL)
-	sigResp, err := http.Get(sigURL)
-	if err != nil {
-		return err
-	}
-
-	log.Debug("Extracting signature")
-	sigPayload, _ := ioutil.ReadAll(sigResp.Body)
-	if err != nil {
-		return err
-	}
-
-	log.Debug("Decoding signature from base64")
-	signature, err := base64.StdEncoding.DecodeString(string(sigPayload))
+	signature, err := getSignature(binURL)
 	if err != nil {
 		return err
 	}
@@ -195,6 +167,32 @@ func downloadAndUpdate(log *logrus.Entry, channel string, latestRelease string) 
 
 func latestUrl(channel string) string {
 	return releaseUrl + channel + "/latest"
+}
+
+// getSignature downloads and decodes the signature file for the file at url
+func getSignature(url string) ([]byte, error) {
+
+	// get signature file
+	response, err := http.Get(url + ".sig")
+	if err != nil {
+		return nil, err
+	}
+
+	// extract payload
+	payload, _ := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// decode signature from base64
+	signature := make([]byte, 128)
+	n, err := base64.StdEncoding.Decode(signature, payload)
+	signature = signature[:n]
+	if err != nil {
+		return nil, err
+	}
+
+	return signature, nil
 }
 
 // taken from https://github.com/inconshreveable/go-update/blob/master/apply.go#L307-L322

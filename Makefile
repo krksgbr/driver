@@ -1,8 +1,8 @@
 ### Release configuration #################################
 # Path to folder in S3 (without slash at end)
-BUCKET := s3://dist.dividat.ch/releases/driver2
+BUCKET = s3://dist.dividat.ch/releases/driver2
 
-# where the BUCKET folder is accessible for getting updates
+# where the BUCKET folder is accessible for getting updates (needs to end with a slash)
 RELEASE_URL = https://dist.dividat.com/releases/driver2/
 
 
@@ -18,12 +18,15 @@ SRC = ./src/cmd/$(BIN)/main.go
 # Get version from git
 VERSION = $(shell git describe --always HEAD)
 
+# set the channel name to the branch name
+CHANNEL = $(shell git rev-parse --abbrev-ref HEAD)
+
 
 ### Simple build ##########################################
 .PHONY: $(BIN)
 $(BIN):
 	GOPATH=$(GOPATH) go build \
-	-ldflags "-X server.channel=none -X server.version=$(VERSION) -X update.releaseUrl=$(RELEASE_URL)" \
+	-ldflags "-X server.channel=$(CHANNEL) -X server.version=$(VERSION) -X update.releaseUrl=$(RELEASE_URL)" \
 	-o bin/$(BIN) $(SRC)
 
 
@@ -55,9 +58,6 @@ crossbuild: $(LINUX) $(DARWIN) $(WINDOWS)
 
 
 ### Release ###############################################
-
-# set the channel name to the branch name
-CHANNEL = $(shell git rev-parse --abbrev-ref HEAD)
 
 RELEASE_DIR = release/$(CHANNEL)/$(VERSION)
 
