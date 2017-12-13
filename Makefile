@@ -112,7 +112,7 @@ release: crossbuild release/$(CHANNEL)/latest
 
 SEMVER_REGEX = ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$
 
-deploy:
+deploy: release
 	# Check if on right channel
 	[[ $(CHANNEL) = "master" || $(CHANNEL) = "develop" ]]
 
