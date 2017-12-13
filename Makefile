@@ -1,9 +1,9 @@
 ### Release configuration #################################
 # Path to folder in S3 (without slash at end)
-BUCKET := s3://dist-test.dividat.ch/releases/driver2
+BUCKET := s3://dist.dividat.ch/releases/driver2
 
 # where the BUCKET folder is accessible for getting updates
-RELEASE_URL = http://dist-test.dividat.ch.s3.amazonaws.com/releases/driver2/
+RELEASE_URL = https://dist.dividat.com/releases/driver2/
 
 
 ### Basic setup ###########################################
@@ -106,7 +106,7 @@ release: crossbuild release/$(CHANNEL)/latest
 		-i "https://www.dividat.com/" \
 		-in $(WINDOWS_RELEASE) \
 		-out $(WINDOWS_RELEASE)
-	
+
 
 ### Deploy ################################################
 
@@ -115,7 +115,7 @@ SEMVER_REGEX = ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\-[0-9A-Za-z-]
 deploy:
 	# Check if on right channel
 	[[ $(CHANNEL) = "master" || $(CHANNEL) = "develop" ]]
-	
+
 	# Check if version is in semver format
 	[[ $(VERSION) =~ $(SEMVER_REGEX) ]]
 

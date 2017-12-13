@@ -19,7 +19,7 @@ import (
 // build var (-ldflags)
 var releaseUrl string
 
-const updateInterval = 60 * time.Second
+const updateInterval = 6 * time.Hour
 
 var rawPublicKey = []byte(`
 -----BEGIN PUBLIC KEY-----
