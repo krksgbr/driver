@@ -82,6 +82,7 @@ func (logServer *LogServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer logServer.mutex.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8") // normal header
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	// first collect entries in slice so that we can intersperse with ",". See also: https://www.happyassassin.net/2017/09/07/a-modest-proposal/
 	entries := make([][]byte, 0, bufferSize)
