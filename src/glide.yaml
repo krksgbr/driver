@@ -15,3 +15,4 @@ import:
 - package: github.com/cenkalti/backoff
   version: ~1.1.0
 - package: github.com/denisbrodbeck/machineid
+- package: github.com/kardianos/service

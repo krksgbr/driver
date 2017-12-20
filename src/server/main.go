@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/sirupsen/logrus"
@@ -19,18 +20,24 @@ var channel string
 const serverPort = "8382"
 
 // Start the driver server
-func Start() {
+func Start(interactive bool) context.CancelFunc {
 
 	// Set up logging
-	logrus.SetLevel(logrus.DebugLevel)
+	logger := logrus.New()
+	if !interactive {
+		logger.Out = ioutil.Discard
+	}
+	logger.SetLevel(logrus.DebugLevel)
 
+	// Log Server
 	logServer := logging.NewLogServer()
-	logrus.AddHook(logServer)
+	logger.AddHook(logServer)
 	http.Handle("/log", logServer)
 
-	logrus.AddHook(logging.NewAMQPHook())
+	// AMQP Log delivery
+	logger.AddHook(logging.NewAMQPHook())
 
-	baseLog := logrus.WithFields(logrus.Fields{
+	baseLog := logger.WithFields(logrus.Fields{
 		"version":        version,
 		"releaseChannel": channel,
 	})
@@ -51,7 +58,6 @@ func Start() {
 
 	// Setup a context
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Setup Senso
 	sensoHandle := senso.New(ctx, baseLog.WithField("package", "senso"))
@@ -65,6 +71,9 @@ func Start() {
 
 	// Setup driver update loop
 	go update.Start(baseLog.WithField("package", "update"), version, channel)
+
+	// Setup HTTP Server
+	server := http.Server{Addr: "127.0.0.1:" + serverPort}
 
 	// Server root
 	rootMsg, _ := json.Marshal(map[string]string{
@@ -83,5 +92,22 @@ func Start() {
 
 	// Start the server
 	log.WithField("port", serverPort).Info("Starting HTTP server.")
-	log.Panic(http.ListenAndServe(":"+serverPort, nil))
+
+	go func() {
+		serverErr := server.ListenAndServe()
+		if serverErr != http.ErrServerClosed {
+			log.Panic(serverErr)
+		}
+	}()
+
+	// cleanup routine
+	go func() {
+		<-ctx.Done()
+
+		log.Info("Server closing down.")
+		server.Close()
+
+	}()
+
+	return cancel
 }
