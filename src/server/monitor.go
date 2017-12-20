@@ -14,6 +14,6 @@ func startMonitor(log *logrus.Entry) {
 
 	for range c {
 		runtime.ReadMemStats(&m)
-		log.WithField("sysMem", m.Sys/1024).WithField("routines", runtime.NumGoroutine()).Info("Monitoring runtime.")
+		log.WithField("heapAlloc", m.HeapAlloc).WithField("routines", runtime.NumGoroutine()).Info("Monitoring runtime.")
 	}
 }
