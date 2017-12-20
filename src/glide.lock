@@ -1,5 +1,5 @@
-hash: 820ff1d6078d6700cf3d20208ac3eabea65c0a867fc7d539ec015ec23ab518e9
-updated: 2017-12-12T11:28:38.495111812+01:00
+hash: c356cbbc7ccd1c40099d7f80b04d1ab775cee8f78e50f9a83f509f0ffa92c3cf
+updated: 2017-12-20T21:05:06.241927552+01:00
 imports:
 - name: github.com/cenkalti/backoff
   version: 61153c768f31ee5f130071d08fc82b85208528de
@@ -22,6 +22,8 @@ imports:
   version: bbd0c6e271208dce66d8fda4bc536453cd27fc4a
   subpackages:
   - '...'
+- name: github.com/kardianos/service
+  version: 14a49b39b37b67e7c4d0f9df86ff005c55e539ff
 - name: github.com/miekg/dns
   version: a5852667e3c36e2e0b0a69ab43869e00e95aacdf
   subpackages:
@@ -48,4 +50,5 @@ imports:
   subpackages:
   - unix
   - windows
+  - windows/registry
 testImports: []
