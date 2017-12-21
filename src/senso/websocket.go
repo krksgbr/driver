@@ -151,25 +151,42 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("WebSocket connection opened")
 
+	// close the WebSocket
+	close := func() {
+		log.Info("Websocket connection closed")
+		conn.Close()
+	}
+
 	// create a mutex for writing to WebSocket (connection supports only one concurrent reader and one concurrent writer (https://godoc.org/github.com/gorilla/websocket#hdr-Concurrency))
 	writeMutex := sync.Mutex{}
 
-	// send data
+	// Send data up the WebSocket
+	send := func(data []byte) error {
+		writeMutex.Lock()
+		conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
+		err := conn.WriteMessage(websocket.BinaryMessage, data)
+		writeMutex.Unlock()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+				log.WithError(err).Error("WebSocket error")
+			}
+			return err
+		}
+		return nil
+	}
+
+	// send data from Control and Data channel
 	go func() {
-		for data := range handle.Data {
-
-			// fmt.Println(data)
-			defer conn.Close()
-
-			writeMutex.Lock()
-			conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
-			err := conn.WriteMessage(websocket.BinaryMessage, data)
-			writeMutex.Unlock()
+		var err error
+		for {
+			select {
+			case data := <-handle.Data:
+				err = send(data)
+			case data := <-handle.Control:
+				err = send(data)
+			}
 
 			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
-					log.WithError(err).Error("WebSocket error")
-				}
 				return
 			}
 		}
@@ -177,7 +194,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// receive messages
 	go func() {
-		defer conn.Close()
+		defer close()
 		for {
 
 			messageType, msg, err := conn.ReadMessage()
