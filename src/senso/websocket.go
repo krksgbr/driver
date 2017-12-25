@@ -151,12 +151,6 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("WebSocket connection opened")
 
-	// close the WebSocket
-	close := func() {
-		log.Info("Websocket connection closed")
-		conn.Close()
-	}
-
 	// create a mutex for writing to WebSocket (connection supports only one concurrent reader and one concurrent writer (https://godoc.org/github.com/gorilla/websocket#hdr-Concurrency))
 	writeMutex := sync.Mutex{}
 
@@ -175,15 +169,19 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return nil
 	}
 
+	// Create channels with data received from Senso
+	rx := handle.broker.Sub("rx")
+
 	// send data from Control and Data channel
 	go func() {
 		var err error
 		for {
 			select {
-			case data := <-handle.Data:
-				err = send(data)
-			case data := <-handle.Control:
-				err = send(data)
+			case i := <-rx:
+				data, ok := i.([]byte)
+				if ok {
+					err = send(data)
+				}
 			}
 
 			if err != nil {
@@ -192,6 +190,15 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	close := func() {
+		// Unsubscribe from broker
+		handle.broker.Unsub(rx)
+
+		// Close websocket connection
+		conn.Close()
+
+		log.Info("Websocket connection closed")
+	}
 	// receive messages
 	go func() {
 		defer close()
@@ -206,11 +213,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if messageType == websocket.BinaryMessage {
-				log.WithField("data", msg).Debug("Forwarding data to control port.")
-				select {
-				case handle.Control <- msg:
-				default:
-				}
+				handle.broker.TryPub(msg, "tx")
 
 			} else if messageType == websocket.TextMessage {
 

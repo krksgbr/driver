@@ -15,7 +15,7 @@ module.exports = net.createServer(function (sock) {
     // Add a 'data' event handler to this instance of socket
   sock.on('data', function (data) {
         // console.log('DATA ' + sock.remoteAddress + ': ' + data);
-    console.log('CONTROL', data)
+    console.log(data)
         // Write the data back to the socket, the client will receive it as data from the server
         // sock.write(data);
   })

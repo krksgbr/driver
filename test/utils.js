@@ -11,6 +11,8 @@ module.exports = {
 
   startDriver: function () {
     return spawn('bin/dividat-driver')
+    // useful for debugging:
+    // return spawn('bin/dividat-driver', [], {stdio: 'inherit'})
   },
 
   getLogs: function () {

@@ -7,7 +7,7 @@ const { spawn } = require('child_process')
 it('make succeeds', function (done) {
   // set timeout to 5s
   this.timeout(5 * 1000)
-  const make = spawn('make')
+  const make = spawn('make', ['CHANNEL=test', 'VERSION=2.0.0'])
   make.on('exit', (code) => {
     if (code === 0) {
       return done()
