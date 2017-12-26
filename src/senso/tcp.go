@@ -17,8 +17,10 @@ const dialTimeout = 5 * time.Second
 // maximal interval to wait between connection retry
 const maxInterval = 30 * time.Second
 
+type onReceive = func([]byte)
+
 // connectTCP creates a persistent tcp connection to address
-func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, data chan []byte) {
+func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, tx chan interface{}, onReceive onReceive) {
 	var dialer net.Dialer
 
 	var log = baseLogger.WithField("address", address)
@@ -69,13 +71,6 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 		readChannel := make(chan []byte)
 		go tcpReader(log, conn, readChannel)
 
-		// create channel for writing data
-		writeChannel := make(chan []byte)
-		// We need an additional channel for handling write errors, unlike the readChannel we don't want to close the channel as somebody might try to write to it
-		writeErrors := make(chan error)
-		defer close(writeChannel)
-		go tcpWriter(conn, writeChannel, writeErrors)
-
 		// Inner loop for handling data
 		disconnected := false
 		for !disconnected {
@@ -87,26 +82,23 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, d
 			case receivedData, more := <-readChannel:
 				if more {
 					// Attempt to send data, if can not send immediately discard
-					select {
-					case data <- receivedData:
-					default:
-					}
+					onReceive(receivedData)
 				} else {
 					disconnected = true
 				}
 
-			case dataToWrite := <-data:
-				writeChannel <- dataToWrite
-
-			case writeError := <-writeErrors:
-				if err, ok := writeError.(net.Error); ok && err.Timeout() {
-					log.Debug("Timeout while writing.")
-				} else {
-					log.WithError(writeError).Error("Write error.")
+			case i := <-tx:
+				data, _ := i.([]byte)
+				err := write(conn, data)
+				if err != nil {
 					disconnected = true
 				}
 			}
 		}
+
+		// Clean up possibly dangling connections
+		conn.Close()
+		log.Info("Connection closed.")
 
 	}
 }
@@ -124,8 +116,6 @@ func tcpReader(log *logrus.Entry, conn net.Conn, channel chan<- []byte) {
 
 		if readErr != nil {
 			if readErr == io.EOF {
-				// connection is closed
-				log.Info("Connection closed by Senso.")
 				return
 			} else if err, ok := readErr.(net.Error); ok && err.Timeout() {
 				// Read timeout, just continue Nothing
@@ -139,29 +129,12 @@ func tcpReader(log *logrus.Entry, conn net.Conn, channel chan<- []byte) {
 	}
 }
 
-// Helper to write to TCP connection. Note that this requires an additional channel to report errors
-func tcpWriter(conn net.Conn, channel <-chan []byte, errorChannel chan<- error) {
-	for {
-
-		dataToWrite, more := <-channel
-
-		if more {
-
-			if conn != nil {
-				conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
-				_, err := conn.Write(dataToWrite)
-
-				if err != nil {
-					errorChannel <- err
-				}
-
-			} else {
-				errorChannel <- errors.New("Can not write to TCP connection, because not connected.")
-			}
-
-		} else {
-			return
-		}
-
+func write(conn net.Conn, data []byte) error {
+	if conn != nil {
+		conn.SetWriteDeadline(time.Now().Add(1 * time.Millisecond))
+		_, err := conn.Write(data)
+		return err
+	} else {
+		return errors.New("Can not write to TCP connection, because not connected.")
 	}
 }

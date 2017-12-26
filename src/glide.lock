@@ -1,5 +1,5 @@
-hash: c356cbbc7ccd1c40099d7f80b04d1ab775cee8f78e50f9a83f509f0ffa92c3cf
-updated: 2017-12-20T21:05:06.241927552+01:00
+hash: 27ea416f84ba2fea73e8901a3928734718c2f2f4d1784f6d8d267577f3b8f4ca
+updated: 2017-12-25T21:03:30.759983018+01:00
 imports:
 - name: github.com/cenkalti/backoff
   version: 61153c768f31ee5f130071d08fc82b85208528de
@@ -7,6 +7,8 @@ imports:
   version: 1817cd4bea52af76542157eeabd74b057d1a199e
   subpackages:
   - semver
+- name: github.com/cskr/pubsub
+  version: d0cbfe51c9165ee318238cab8ba70ff068245502
 - name: github.com/denisbrodbeck/machineid
   version: e59b4a9b1b28de48436e47104472050658bacfcf
 - name: github.com/gorilla/websocket
@@ -22,6 +24,8 @@ imports:
   version: bbd0c6e271208dce66d8fda4bc536453cd27fc4a
   subpackages:
   - '...'
+- name: github.com/kardianos/osext
+  version: ae77be60afb1dcacde03767a8c37337fad28ac14
 - name: github.com/kardianos/service
   version: 14a49b39b37b67e7c4d0f9df86ff005c55e539ff
 - name: github.com/miekg/dns
@@ -51,4 +55,7 @@ imports:
   - unix
   - windows
   - windows/registry
+  - windows/svc
+  - windows/svc/eventlog
+  - windows/svc/mgr
 testImports: []

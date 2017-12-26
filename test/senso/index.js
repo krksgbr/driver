@@ -64,24 +64,18 @@ describe('Basic functionality', () => {
 
     ws.send(cmd)
 
-    // Wait a bit until connection is opened
-    // TODO: check for logs when connection is opened
-    await wait(500)
+    // wait until mock senso has a connection
+    await Promise.all([getConnection(senso.data), getConnection(senso.control)])
 
     return ws
   }
 
   it('Can connect to a mock Senso.', async function () {
-  // disable mocha timeout
-    this.timeout(0)
+    // It takes at least 1s to connect (as driver waits one sec between data and control connection)
+    this.timeout(1500)
 
-    const controlConnection = getConnection(senso.control).timeout(500)
-    const dataConnection = getConnection(senso.data).timeout(500)
-
-    await connectSensoWS()
+    return connectSensoWS()
     .then(connectWithMockSenso)
-
-    return Promise.all([controlConnection, dataConnection])
   })
 
   it('Can get connection status', async function () {
@@ -103,18 +97,66 @@ describe('Basic functionality', () => {
     })
   })
 
-  it('Data is forwarded from Senso data channel to WS.', async function () {
+  it('Data is forwarded from Senso data channel to WS', async function () {
     const sensoWS = await connectSensoWS().then(connectWithMockSenso)
 
-    const buffer = Buffer.from(new ArrayBuffer(10))
+    const chunkSize = 64
+    const n = 1000
+    this.timeout(1000 + n * 4 + 500)
 
-    const readBuffer = expectEvent(sensoWS, 'message', (incoming) => {
-      return (buffer.compare(incoming) === 0)
+    const expectOnWS = new Promise((resolve, reject) => {
+      var received = 0
+      sensoWS.on('message', (msg) => {
+        received = received + msg.length
+
+        if (received >= chunkSize * n) {
+          resolve()
+        }
+      })
     })
 
-    senso.data.stream.write(buffer)
+    const buffer = Buffer.from(new ArrayBuffer(chunkSize))
+    for (var i = 0; i < n; i++) {
+      senso.data.stream.write(buffer)
+      // Give one ms time for forwarding
+      await wait(1)
+    }
 
-    return readBuffer
+    return expectOnWS
+  })
+
+  it('Data is forwarded from WS to control channel', async function () {
+    const sensoWS = await connectSensoWS()
+    sensoWS.send(JSON.stringify({
+      type: 'Connect',
+      address: '127.0.0.1'
+    }))
+
+    const controlConnection = await getConnection(senso.control)
+
+    const chunkSize = 64
+    const n = 1000
+    this.timeout(1000 + n * 2 + 500)
+
+    const expectData = new Promise((resolve, reject) => {
+      var received = 0
+      controlConnection.on('data', (data) => {
+        received = received + data.length
+
+        if (received >= chunkSize * n) {
+          resolve()
+        }
+      })
+    })
+
+    const buffer = Buffer.from(new ArrayBuffer(chunkSize))
+    for (var i = 0; i < n; i++) {
+      sensoWS.send(buffer)
+      // Give one ms time for forwarding
+      await wait(1)
+    }
+
+    return expectData
   })
 
   it('Can discover mock Senso', async function () {

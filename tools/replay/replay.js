@@ -29,6 +29,10 @@ module.exports = function (recFile, timeout) {
       console.log('DATA - Closed: ' + socket.remoteAddress + ' ' + socket.remotePort)
     })
 
+    socket.on('data', function (data) {
+      console.log(data)
+    })
+
     socket.on('error', (err) => {
       console.log('Error: ', err)
     })

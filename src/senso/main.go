@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/cskr/pubsub"
 	"github.com/sirupsen/logrus"
 )
 
 // Handle for managing Senso
 type Handle struct {
-	Data    chan []byte
-	Control chan []byte
+	broker *pubsub.PubSub
 
 	Address *string
 
@@ -29,9 +29,14 @@ func New(ctx context.Context, log *logrus.Entry) *Handle {
 
 	handle.log = log
 
-	// Channels for data and control
-	handle.Data = make(chan []byte)
-	handle.Control = make(chan []byte)
+	// PubSub broker
+	handle.broker = pubsub.New(32)
+
+	// Clean up
+	go func() {
+		<-ctx.Done()
+		handle.broker.Shutdown()
+	}()
 
 	return &handle
 }
@@ -50,9 +55,13 @@ func (handle *Handle) Connect(address string) {
 
 	handle.log.WithField("address", address).Info("Attempting to connect with Senso.")
 
-	go connectTCP(ctx, handle.log.WithField("channel", "data"), address+":55568", handle.Data)
+	onReceive := func(data []byte) {
+		handle.broker.TryPub(data, "rx")
+	}
+
+	go connectTCP(ctx, handle.log.WithField("channel", "data"), address+":55568", handle.broker.Sub("noTx"), onReceive)
 	time.Sleep(1000 * time.Millisecond)
-	go connectTCP(ctx, handle.log.WithField("channel", "control"), address+":55567", handle.Control)
+	go connectTCP(ctx, handle.log.WithField("channel", "control"), address+":55567", handle.broker.Sub("tx"), onReceive)
 
 	handle.cancelCurrentConnection = cancel
 }
