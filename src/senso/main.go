@@ -32,6 +32,12 @@ func New(ctx context.Context, log *logrus.Entry) *Handle {
 	// PubSub broker
 	handle.broker = pubsub.New(32)
 
+	// Clean up
+	go func() {
+		<-ctx.Done()
+		handle.broker.Shutdown()
+	}()
+
 	return &handle
 }
 
