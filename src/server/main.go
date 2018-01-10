@@ -13,6 +13,9 @@ import (
 	"update"
 )
 
+// Uncomment following line for profiling. And run `go tool pprof http://localhost:8382/debug/pprof/profile` or `go tool pprof http://localhost:8382/debug/pprof/heap`
+// import _ "net/http/pprof"
+
 // build var (-ldflags)
 var version string
 var channel string

@@ -151,14 +151,32 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("WebSocket connection opened")
 
-	// create a mutex for writing to WebSocket (connection supports only one concurrent reader and one concurrent writer (https://godoc.org/github.com/gorilla/websocket#hdr-Concurrency))
+	// Create a mutex for writing to WebSocket (connection supports only one concurrent reader and one concurrent writer (https://godoc.org/github.com/gorilla/websocket#hdr-Concurrency))
 	writeMutex := sync.Mutex{}
 
-	// Send data up the WebSocket
-	send := func(data []byte) error {
+	// Create a context for this WebSocket connection
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Send binary data up the WebSocket
+	sendBinary := func(data []byte) error {
 		writeMutex.Lock()
 		conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
 		err := conn.WriteMessage(websocket.BinaryMessage, data)
+		writeMutex.Unlock()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+				log.WithError(err).Error("WebSocket error")
+			}
+			return err
+		}
+		return nil
+	}
+
+	// send messgae up the WebSocket
+	sendMessage := func(message Message) error {
+		writeMutex.Lock()
+		conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
+		err := conn.WriteJSON(&message)
 		writeMutex.Unlock()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
@@ -173,33 +191,23 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rx := handle.broker.Sub("rx")
 
 	// send data from Control and Data channel
-	go func() {
-		var err error
-		for {
-			select {
-			case i := <-rx:
-				data, ok := i.([]byte)
-				if ok {
-					err = send(data)
-				}
-			}
+	go rx_data_loop(ctx, rx, sendBinary)
 
-			if err != nil {
-				return
-			}
-		}
-	}()
-
+	// Helper function to close the connection
 	close := func() {
 		// Unsubscribe from broker
 		handle.broker.Unsub(rx)
+
+		// Cancel the context
+		cancel()
 
 		// Close websocket connection
 		conn.Close()
 
 		log.Info("Websocket connection closed")
 	}
-	// receive messages
+
+	// Main loop for the WebSocket connection
 	go func() {
 		defer close()
 		for {
@@ -223,60 +231,12 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					log.WithField("rawCommand", msg).WithError(decodeErr).Warning("Can not decode command.")
 					continue
 				}
-
 				log.WithField("command", prettyPrintCommand(command)).Debug("Received command.")
 
-				if command.GetStatus != nil {
-
-					var message Message
-
-					message.Status = &Status{Address: handle.Address}
-
-					writeMutex.Lock()
-					conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
-					writeErr := conn.WriteJSON(&message)
-					writeMutex.Unlock()
-
-					if writeErr != nil {
-						log.WithError(writeErr).Error("WebSocket write error.")
-						continue
-					}
-
-				} else if command.Connect != nil {
-					handle.Connect(command.Connect.Address)
-
-				} else if command.Disconnect != nil {
-					handle.Disconnect()
-
-				} else if command.Discover != nil {
-
-					discoveryCtx, cancelDiscovery := context.WithTimeout(context.Background(), time.Duration(command.Discover.Duration)*time.Second)
-					defer cancelDiscovery()
-
-					entries := handle.Discover(discoveryCtx)
-
-					go func(entries chan *zeroconf.ServiceEntry) {
-						for entry := range entries {
-							log.WithField("service", entry).Debug("Discovered service.")
-
-							var message Message
-							message.Discovered = entry
-
-							writeMutex.Lock()
-							conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
-							writeErr := conn.WriteJSON(&message)
-							writeMutex.Unlock()
-
-							if writeErr != nil {
-								log.WithError(writeErr).Error("WebSocket write error.")
-							}
-
-						}
-						log.Debug("Discovery finished.")
-					}(entries)
-
+				err := handle.dispatchCommand(ctx, log, command, sendMessage)
+				if err != nil {
+					return
 				}
-
 			}
 
 		}
@@ -285,6 +245,78 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // HELPERS
+
+// dispatchCommand handles incomming commands and sends responses back up the WebSocket
+func (handle *Handle) dispatchCommand(ctx context.Context, log *logrus.Entry, command Command, sendMessage func(Message) error) error {
+
+	if command.GetStatus != nil {
+
+		var message Message
+
+		message.Status = &Status{Address: handle.Address}
+
+		err := sendMessage(message)
+
+		if err != nil {
+			return err
+		}
+
+	} else if command.Connect != nil {
+		handle.Connect(command.Connect.Address)
+		return nil
+
+	} else if command.Disconnect != nil {
+		handle.Disconnect()
+		return nil
+
+	} else if command.Discover != nil {
+
+		discoveryCtx, _ := context.WithTimeout(ctx, time.Duration(command.Discover.Duration)*time.Second)
+
+		entries := handle.Discover(discoveryCtx)
+
+		go func(entries chan *zeroconf.ServiceEntry) {
+			for entry := range entries {
+				log.WithField("service", entry).Debug("Discovered service.")
+
+				var message Message
+				message.Discovered = entry
+
+				err := sendMessage(message)
+				if err != nil {
+					return
+				}
+
+			}
+			log.Debug("Discovery finished.")
+		}(entries)
+
+		return nil
+
+	}
+	return nil
+}
+
+// rx_data_loop reads data from Senso and forwards it up the WebSocket
+func rx_data_loop(ctx context.Context, rx chan interface{}, send func([]byte) error) {
+	var err error
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case i := <-rx:
+			data, ok := i.([]byte)
+			if ok {
+				err = send(data)
+			}
+		}
+
+		if err != nil {
+			return
+		}
+	}
+}
 
 // Helper to upgrade http to WebSocket
 var webSocketUpgrader = websocket.Upgrader{
