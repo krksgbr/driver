@@ -74,8 +74,83 @@ describe('Basic functionality', () => {
     // It takes at least 1s to connect (as driver waits one sec between data and control connection)
     this.timeout(1500)
 
-    return connectSensoWS()
+    await connectSensoWS()
     .then(connectWithMockSenso)
+  })
+
+  it('Can connect and disconnect to a mock Senso.', async function () {
+    // It takes at least 1s to connect (as driver waits one sec between data and control connection)
+    this.timeout(1500)
+
+    var ws = await connectSensoWS()
+
+    var cmd = JSON.stringify({
+      type: 'Connect',
+      address: '127.0.0.1'
+    })
+
+    ws.send(cmd)
+
+    var dataConnection = await getConnection(senso.data)
+    var controlConnection = await getConnection(senso.control)
+
+    var dataConnectionCloses = new Promise((resolve, reject) => {
+      dataConnection.on('close', () => {
+        resolve()
+      })
+    })
+
+    var controlConnectionCloses = new Promise((resolve, reject) => {
+      controlConnection.on('close', () => {
+        resolve()
+      })
+    })
+
+    cmd = JSON.stringify({
+      type: 'Disconnect'
+    })
+
+    ws.send(cmd)
+
+    return Promise.all([dataConnectionCloses, controlConnectionCloses])
+  })
+
+  it('Disconnect on multiple Connects.', async function () {
+    // It takes at least 1s to connect (as driver waits one sec between data and control connection)
+    this.timeout(1500)
+
+    var ws = await connectSensoWS()
+
+    var cmd = JSON.stringify({
+      type: 'Connect',
+      address: '127.0.0.1'
+    })
+
+    ws.send(cmd)
+
+    var dataConnection = await getConnection(senso.data)
+    var controlConnection = await getConnection(senso.control)
+
+    var dataConnectionCloses = new Promise((resolve, reject) => {
+      dataConnection.on('close', () => {
+        resolve()
+      })
+    })
+
+    var controlConnectionCloses = new Promise((resolve, reject) => {
+      controlConnection.on('close', () => {
+        resolve()
+      })
+    })
+
+    cmd = JSON.stringify({
+      type: 'Connect',
+      address: '127.0.0.1'
+    })
+
+    ws.send(cmd)
+
+    return Promise.all([dataConnectionCloses, controlConnectionCloses])
   })
 
   it('Can get connection status', async function () {
