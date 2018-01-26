@@ -51,7 +51,13 @@ func NewLogServer() *LogServer {
 
 // Levels implements the logrus.Hook interface
 func (logServer *LogServer) Levels() []logrus.Level {
-	return logrus.AllLevels
+	return []logrus.Level{
+		logrus.PanicLevel,
+		logrus.FatalLevel,
+		logrus.ErrorLevel,
+		logrus.WarnLevel,
+		logrus.InfoLevel,
+	}
 }
 
 // Fire implements the logrus.Hook interface
