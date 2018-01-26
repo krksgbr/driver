@@ -2,6 +2,7 @@ package senso
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/cskr/pubsub"
@@ -17,6 +18,7 @@ type Handle struct {
 	ctx context.Context
 
 	cancelCurrentConnection context.CancelFunc
+	connectionChangeMutex   *sync.Mutex
 
 	log *logrus.Entry
 }
@@ -28,6 +30,8 @@ func New(ctx context.Context, log *logrus.Entry) *Handle {
 	handle.ctx = ctx
 
 	handle.log = log
+
+	handle.connectionChangeMutex = &sync.Mutex{}
 
 	// PubSub broker
 	handle.broker = pubsub.New(32)
@@ -43,6 +47,10 @@ func New(ctx context.Context, log *logrus.Entry) *Handle {
 
 // Connect to a Senso, will create TCP connections to control and data ports
 func (handle *Handle) Connect(address string) {
+
+	// Only allow one connection change at a time
+	handle.connectionChangeMutex.Lock()
+	defer handle.connectionChangeMutex.Unlock()
 
 	// disconnect current connection first
 	handle.Disconnect()
