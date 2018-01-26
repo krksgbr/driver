@@ -52,6 +52,8 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, t
 
 	var backOffStrategy = backoff.WithContext(expBackoff, ctx)
 
+	defer log.Info("Connection closed.")
+
 	for true {
 
 		backOffStrategy.Reset()
@@ -85,6 +87,7 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, t
 					onReceive(receivedData)
 				} else {
 					disconnected = true
+					break
 				}
 
 			case i := <-tx:
@@ -92,13 +95,10 @@ func connectTCP(ctx context.Context, baseLogger *logrus.Entry, address string, t
 				err := write(conn, data)
 				if err != nil {
 					disconnected = true
+					break
 				}
 			}
 		}
-
-		// Clean up possibly dangling connections
-		conn.Close()
-		log.Info("Connection closed.")
 
 	}
 }
@@ -120,7 +120,7 @@ func tcpReader(log *logrus.Entry, conn net.Conn, channel chan<- []byte) {
 			} else if err, ok := readErr.(net.Error); ok && err.Timeout() {
 				// Read timeout, just continue Nothing
 			} else {
-				log.WithError(readErr).Error("Read error.")
+				// log.WithError(readErr).Error("Read error.")
 				return
 			}
 		} else {
