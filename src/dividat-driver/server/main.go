@@ -8,9 +8,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"logging"
-	"senso"
-	"update"
+	"dividat-driver/logging"
+	"dividat-driver/senso"
+	"dividat-driver/update"
 )
 
 // Uncomment following line for profiling. And run `go tool pprof http://localhost:8382/debug/pprof/profile` or `go tool pprof http://localhost:8382/debug/pprof/heap`
