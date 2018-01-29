@@ -13,7 +13,7 @@ GOPATH = $(CWD)
 
 # Main source to build
 BIN = dividat-driver
-SRC = ./src/cmd/$(BIN)/main.go
+SRC = ./src/$(BIN)/main.go
 
 # Get version from git
 VERSION = $(shell git describe --always HEAD)
@@ -21,22 +21,25 @@ VERSION = $(shell git describe --always HEAD)
 # set the channel name to the branch name
 CHANNEL = $(shell git rev-parse --abbrev-ref HEAD)
 
+GO_LINK_VARIABLES = -ldflags "-X dividat-driver.server.channel=$(CHANNEL) -X dividat-driver.server.version=$(VERSION) -X dividat-driver.update.releaseUrl=$(RELEASE_URL)"
 
 ### Simple build ##########################################
 .PHONY: $(BIN)
 $(BIN):
-	GOPATH=$(GOPATH) go build \
-	-ldflags "-X server.channel=$(CHANNEL) -X server.version=$(VERSION) -X update.releaseUrl=$(RELEASE_URL)" \
-	-o bin/$(BIN) $(SRC)
+	GOPATH=$(GOPATH) go build $(GO_LINK_VARIABLES) -o bin/$(BIN) $(SRC)
+
+
+### Simple build ##########################################
+.PHONY: test
+test: deps
+	npm test
 
 
 ### Cross compilation #####################################
 
 # helper for cross compilation
 define cross-build
-	GOOS=$(1) GOARCH=amd64 GOPATH=$(GOPATH) go build \
-	  -ldflags "-X server.channel=$(CHANNEL) -X server.version=$(VERSION) -X update.releaseUrl=$(RELEASE_URL)" \
-		-o $(2) $(SRC)
+	GOOS=$(1) GOARCH=amd64 GOPATH=$(GOPATH) go build $(GO_LINK_VARIABLES) -o $(2) $(SRC)
 endef
 
 LINUX = $(BIN)-linux-amd64
@@ -132,7 +135,7 @@ deploy: release
 
 ### Dependencies and cleanup ##############################
 deps:
-	cd src && glide install
+	cd src/$(BIN) && dep ensure 
 	npm install
 
 clean:

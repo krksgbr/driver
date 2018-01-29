@@ -7,7 +7,8 @@ package main
 import (
 	"context"
 	"log"
-	"server"
+
+	"dividat-driver/server"
 
 	"github.com/kardianos/service"
 )

@@ -1,5 +1,5 @@
 node_modules/
-src/vendor/
+src/dividat-driver/vendor/
 
 release/
 bin/
