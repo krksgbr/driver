@@ -1,11 +1,18 @@
 # Dividat Driver
 
+[![Build Status](https://travis-ci.org/dividat/driver.svg?branch=develop)](https://travis-ci.org/dividat/driver)
+
 Dividat drivers and hardware test suites.
 
 ## Prerequisites
 
+For building and testing all dependencies can be installed via [Nix](https://nixos.org/nix).
+
+Alternatively you need:
+
 -   [Go](https://golang.org/)
--   [Glide](https://glide.sh/)
+-   [Dep](https://github.com/golang/dep)
+-   [NodeJS](https://nodejs.org/)
 
 For packaging:
 
@@ -43,7 +50,7 @@ Firefox, Safari and Edge not supported as they are not yet properly implementing
 
 ## Tests
 
-Run the test suite with: `npm test`.
+Run the test suite with: `make test`.
 
 ## Tools
 
