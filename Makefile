@@ -21,12 +21,12 @@ VERSION = $(shell git describe --always HEAD)
 # set the channel name to the branch name
 CHANNEL = $(shell git rev-parse --abbrev-ref HEAD)
 
-GO_LINK_VARIABLES = -ldflags "-X dividat-driver.server.channel=$(CHANNEL) -X dividat-driver.server.version=$(VERSION) -X dividat-driver.update.releaseUrl=$(RELEASE_URL)"
+GO_LDFLAGS = -ldflags "-X dividat-driver/server.channel=$(CHANNEL) -X dividat-driver/server.version=$(VERSION) -X dividat-driver/update.releaseUrl=$(RELEASE_URL)"
 
 ### Simple build ##########################################
 .PHONY: $(BIN)
 $(BIN):
-	GOPATH=$(GOPATH) go build $(GO_LINK_VARIABLES) -o bin/$(BIN) $(SRC)
+	GOPATH=$(GOPATH) go build $(GO_LDFLAGS) -o bin/$(BIN) $(SRC)
 
 
 ### Simple build ##########################################
