@@ -1,0 +1,3 @@
+codesign.p12 filter=git-crypt diff=git-crypt
+checksumsign.private.pem filter=git-crypt diff=git-crypt
+
