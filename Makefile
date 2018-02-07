@@ -39,7 +39,7 @@ test: deps
 
 # helper for cross compilation
 define cross-build
-	GOOS=$(1) GOARCH=amd64 GOPATH=$(GOPATH) go build $(GO_LINK_VARIABLES) -o $(2) $(SRC)
+	GOOS=$(1) GOARCH=amd64 GOPATH=$(GOPATH) go build $(GO_LDFLAGS) -o $(2) $(SRC)
 endef
 
 LINUX = $(BIN)-linux-amd64
