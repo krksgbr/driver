@@ -23,6 +23,9 @@ CHANNEL = $(shell git rev-parse --abbrev-ref HEAD)
 
 GO_LDFLAGS = -ldflags "-X dividat-driver/server.channel=$(CHANNEL) -X dividat-driver/server.version=$(VERSION) -X dividat-driver/update.releaseUrl=$(RELEASE_URL)"
 
+CODE_SIGNING_CERT ?= ./keys/codesign.p12
+CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
+
 ### Simple build ##########################################
 .PHONY: $(BIN)
 $(BIN):
