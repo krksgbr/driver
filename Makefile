@@ -11,15 +11,18 @@ RELEASE_URL = https://dist.dividat.com/releases/driver2/
 CWD = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 GOPATH = $(CWD)
 
+# Set GOROOT to one matching go binary (Travis CI)
+GOROOT := $(shell which go)/../../share/go
+
 # Main source to build
 BIN = dividat-driver
 SRC = ./src/$(BIN)/main.go
 
 # Get version from git
-VERSION = $(shell git describe --always HEAD)
+VERSION := $(shell git describe --always HEAD)
 
 # set the channel name to the branch name
-CHANNEL = $(shell git rev-parse --abbrev-ref HEAD)
+CHANNEL := $(shell git rev-parse --abbrev-ref HEAD)
 
 GO_LDFLAGS = -ldflags "-X dividat-driver/server.channel=$(CHANNEL) -X dividat-driver/server.version=$(VERSION) -X dividat-driver/update.releaseUrl=$(RELEASE_URL)"
 
@@ -29,7 +32,7 @@ CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 ### Simple build ##########################################
 .PHONY: $(BIN)
 $(BIN): deps
-	GOPATH=$(GOPATH) go build $(GO_LDFLAGS) -o bin/$(BIN) $(SRC)
+	GOROOT=$(GOROOT) GOPATH=$(GOPATH) go build $(GO_LDFLAGS) -o bin/$(BIN) $(SRC)
 
 
 ### Test suite ##########################################
@@ -43,7 +46,7 @@ test: $(BIN)
 
 # helper for cross compilation
 define cross-build
-	GOOS=$(1) GOARCH=amd64 GOPATH=$(GOPATH) go build $(GO_LDFLAGS) -o $(2) $(SRC)
+	GOOS=$(1) GOARCH=amd64 GOROOT=$(GOROOT) GOPATH=$(GOPATH) go build $(GO_LDFLAGS) -o $(2) $(SRC)
 endef
 
 LINUX = $(BIN)-linux-amd64
