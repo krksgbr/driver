@@ -39,7 +39,7 @@ $(BIN): deps
 .PHONY: test
 test: $(BIN)
 	npm install
-	npm test
+	npm tex
 
 
 ### Cross compilation #####################################
