@@ -28,13 +28,14 @@ CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 
 ### Simple build ##########################################
 .PHONY: $(BIN)
-$(BIN):
+$(BIN): deps
 	GOPATH=$(GOPATH) go build $(GO_LDFLAGS) -o bin/$(BIN) $(SRC)
 
 
-### Simple build ##########################################
+### Test suite ##########################################
 .PHONY: test
-test: deps
+test: $(BIN)
+	npm install
 	npm test
 
 
@@ -138,8 +139,7 @@ deploy: release
 
 ### Dependencies and cleanup ##############################
 deps:
-	cd src/$(BIN) && dep ensure 
-	npm install
+	cd src/$(BIN) && dep ensure
 
 clean:
 	rm -rf release/
