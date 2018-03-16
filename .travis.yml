@@ -1,2 +1,2 @@
 language: nix
-script: nix-shell --command "make test"
+script: nix-shell --command "go version && make test"
