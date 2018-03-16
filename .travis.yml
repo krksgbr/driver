@@ -1,10 +1,2 @@
 language: nix
 script: nix-shell --command "go version && make test"
-notifications:
-  slack:
-    on_success: change
-    on_failure: always
-    on_start: true
-    on_pull_requests: true
-    rooms:
-      secure: kZPhcdqKE2Q6kokCmyr64Axaj+conB0y0//YXXa/pHgqNaAq2hLL0BTC3CtFD0WoDFbEcQG9ahehqvKQJJYLcfBSCt+D7VfVVSdK52YLd2LlYJUhx4Ktn6z9wcyzeY00jtZBORi+D40VrVwHKmcEDK0WiNx7neaA+pPXZTGhq1QAb0JhnNjnNWH8+WbRafBSFyisIJnClLGziDT5QSbb8v022yPWu0i7I6Bv6Yqp4gR3AoaZa+rDukQ0Klnr7IFKv4KqNpGB8pyFN+DHzP/KK2KgxovZtz4kOVXHk6P4fWrYmuwMflcatq22OdcMCBfJqaBhDLXwHgw1JOqBoZ3ck0sVymFVIfNEY5eDYq0+XS4jHh2AsOPXZcliDACWWYKhj7D3300OyBNCCm7L5136NBMGbmhKgFgtBwsaClNxIkGnRwT1cX9iJzIWc+yL3hJeNYzNcOG4IjshxgG/za1N3enbjCJmlY4yPBHmo0fU5KgDetqeduEHPKXvX5g/9NIyFnq7F4kM6h6eFL+4QDARbBu6UufJ906MPgsaqzWotwEU0MVZQSAA6SkJjfVfsCPLcHePyVKsQp1wP2YgjUjq8+RZRuyugZ6KU7UtYs1SProcD2F9Ul8S1Gn2a/ueZLCG9MLLZCqins8Yz+HWVvR/9ePmA8q7GJ7vPvlUpHZ2AYM=
