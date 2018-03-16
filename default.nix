@@ -1,4 +1,12 @@
-with import <nixpkgs> {};
+with import <nixpkgs> {
+  overlays = [ 
+    (self: super: {
+      dep = import ./nix/dep.nix super;
+    })
+  ];
+};
+
+
 
 stdenv.mkDerivation {
     name = "dividat-driver";
