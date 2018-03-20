@@ -5,6 +5,12 @@ var net = require('net')
 var HOST = '0.0.0.0'
 var PORT = 55567
 
+// Firmware version to report in DEV_INFO
+const VERSION_MAJOR = 1
+const VERSION_MINOR = 2
+const VERSION_FEATURE = 0
+const VERSION_FIX = 0
+
 // DATA_TYPES
 const DATA_TYPE_GET_DEV_INFO = 0xD1
 const DATA_TYPE_GET_VCC_INFO = 0xD2
@@ -41,6 +47,17 @@ module.exports = net.createServer(function (sock) {
   })
 }).listen(PORT, HOST)
 
+function devInfoItem () {
+  var devInfoItem = Buffer.alloc(32)
+  devInfoItem.writeUInt32LE(0, 0)
+  devInfoItem.writeUInt32LE(0, 4)
+  devInfoItem.writeInt8(VERSION_MAJOR, 11)
+  devInfoItem.writeInt8(VERSION_MINOR, 10)
+  devInfoItem.writeInt8(VERSION_FEATURE, 9)
+  devInfoItem.writeInt8(VERSION_FIX, 8)
+  return devInfoItem
+}
+
 function devInfo () {
   var header = Buffer.alloc(8)
 
@@ -48,9 +65,15 @@ function devInfo () {
   lenType.writeUInt16LE(32 * 6, 0)
   lenType.writeUInt16LE(DATA_TYPE_GET_DEV_INFO | 0x8000, 2)
 
-  var devInfoItems = Buffer.alloc(32 * 6)
-
-  return Buffer.concat([header, lenType, devInfoItems])
+  return Buffer.concat([header,
+    lenType,
+    devInfoItem(),
+    devInfoItem(),
+    devInfoItem(),
+    devInfoItem(),
+    devInfoItem(),
+    devInfoItem()
+  ])
 }
 
 function vccInfo () {
