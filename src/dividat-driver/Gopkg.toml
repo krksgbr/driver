@@ -40,6 +40,10 @@ ignored = ["server","senso"]
   version = "1.2.0"
 
 [[constraint]]
+  name = "github.com/ebfe/scard"
+  revision = "136eebbd7d749e6354ed1bb105b88f89c7d80b03"
+
+[[constraint]]
   name = "github.com/grandcat/zeroconf"
 
 [[constraint]]
