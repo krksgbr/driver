@@ -9,26 +9,39 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const UID_APDU = []byte{0xFF, 0xCA, 0x00, 0x00, 0x00}
+var READER_POLLING_INTERVAL = 500 * time.Millisecond
+var CARD_POLLING_INTERVAL = 50 * time.Millisecond
+
+// Special MSFT name to bolt plug&play onto PC/SC
+// Supported by winscard and libpcsc
+const MAGIC_PNP_NAME = "\\\\?PnP?\\Notification"
+
+// APDU to retrieve a card's UID
+var UID_APDU = []byte{0xFF, 0xCA, 0x00, 0x00, 0x00}
 
 func pollSmartCard(ctx context.Context, log *logrus.Entry, callback func(string)) {
-	log.Info("Starting RFID scanner.")
-
 	// Establish a PC/SC context
-	context, err := scard.EstablishContext()
+	scard_ctx, err := scard.EstablishContext()
 	if err != nil {
 		log.WithError(err).Error("Error EstablishContext:")
 		return
 	}
-	defer context.Release()
+	defer scard_ctx.Release()
 
-	var reader *string
+	// Detect PnP support
+	pnpReaderStates := []scard.ReaderState{
+		makeReaderState(MAGIC_PNP_NAME),
+	}
+	scard_ctx.GetStatusChange(pnpReaderStates, 0)
+	hasPnP := !is(pnpReaderStates[0].EventState, scard.StateUnknown)
+
+	log.WithField("pnp", hasPnP).Info("Starting RFID scanner.")
+
+	var availableReaders []string = make([]string, 0)
+	var lastKnownState map[string]scard.StateFlag = map[string]scard.StateFlag{}
 	var uid *string
 
 	for {
-
-		// Throttle loop
-		time.Sleep(50 * time.Millisecond)
 
 		select {
 		case <-ctx.Done():
@@ -36,61 +49,141 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, callback func(string)
 			return
 
 		default:
-			// TODO Use GetStatusChange to avoid polling on Linux/Win
-			readers, err := context.ListReaders()
+			// Retrieve available readers
+			newReaders, err := scard_ctx.ListReaders()
 			if err != nil {
-				log.WithError(err).Error("Error ListReaders:")
+				log.WithError(err).Error("Error listing readers.")
 				return
 			}
+			announceReaderChanges(log, availableReaders, newReaders)
+			availableReaders = newReaders
 
-			if len(readers) == 0 {
-				reader = nil
+			// Wait for readers to appear
+			if len(availableReaders) == 0 {
 				uid = nil
 
+				if hasPnP {
+					// `GetStatusChange` acts as a smarter sleep that finishes early
+					pnpReaderStates := []scard.ReaderState{
+						makeReaderState(MAGIC_PNP_NAME),
+					}
+					scard_ctx.GetStatusChange(pnpReaderStates, READER_POLLING_INTERVAL)
+				} else {
+					time.Sleep(READER_POLLING_INTERVAL)
+				}
+
+				// Restart loop to list readers
 				continue
 			}
 
-			// TODO This just uses the first reader. What is a proper seletion criterion?
-			if reader == nil || *reader != readers[0] {
-				reader = &readers[0]
-				log.Info(fmt.Sprintf("Using reader: %s", *reader))
-			}
-
+			// Now there are available readers
 			// Wait for card presence
-			readerStates := []scard.ReaderState{
-				{Reader: *reader},
+			readerStates := make([]scard.ReaderState, len(availableReaders))
+			for ix, readerName := range availableReaders {
+				flag, ok := lastKnownState[readerName]
+				if ok {
+					readerStates[ix] = makeReaderState(readerName, flag)
+				} else {
+					readerStates[ix] = makeReaderState(readerName)
+				}
 			}
-			context.GetStatusChange(readerStates, -1)
-			if (readerStates[0].EventState & scard.StatePresent) == 0 {
+			// We could block until a card status changes here, but have to
+			// unblock periodically to check if our context has been cancelled
+			code := scard_ctx.GetStatusChange(readerStates, CARD_POLLING_INTERVAL)
+			if code == scard.ErrTimeout {
 				continue
 			}
 
-			// Connect to the card
-			card, err := context.Connect(*reader, scard.ShareShared, scard.ProtocolAny)
-			if err != nil {
-				log.WithError(err).Error("Error Connect:")
-				uid = nil
-				continue
-			}
+			// TODO Maybe the readerStates should outlive the loop and known readers should keep their state?
+			//      Then the `uid` could live within the loop and transmit error would be avoided.
+			//      Problem with this is that we can not watch 100% of the time and could miss state changes in readers.
+			//      Maybe this is not actually a problem: We pass the "current" state, so it should diff wrt that.
+			// One or more readers changed their status
+			for _, readerState := range readerStates {
+				fmt.Println("LOOPING readers")
 
-			// Request UID
-			response, err := card.Transmit(UID_APDU)
-			if err != nil {
-				log.WithError(err).Debug("Error Transmit:")
-				uid = nil
-				continue
-			}
-			scanned_uid := ""
-			for i := 0; i < len(response)-2; i++ {
-				scanned_uid += fmt.Sprintf("%X", response[i])
-			}
-			if len(scanned_uid) > 0 && (uid == nil || *uid != scanned_uid) {
-				uid = &scanned_uid
-				log.Info("Detected RFID token.")
-				callback(*uid)
-			}
+				if readerState.CurrentState == readerState.EventState {
+					// This reader has not changed.
+					continue
+				}
 
-			card.Disconnect(scard.LeaveCard)
+				if is(readerState.EventState, scard.StateChanged) {
+					// Event state becomes current state
+					readerState.CurrentState = readerState.EventState
+					// Keep track of last known state for next refresh cycle
+					lastKnownState[readerState.Reader] = readerState.CurrentState
+				} else {
+					continue
+				}
+
+				if !is(readerState.CurrentState, scard.StatePresent) {
+					// This reader has no card.
+					continue
+				}
+
+				// Connect to the card
+				card, err := scard_ctx.Connect(readerState.Reader, scard.ShareShared, scard.ProtocolAny)
+				if err != nil {
+					log.WithError(err).Error("Error connecting to card.")
+					uid = nil
+					continue
+				}
+
+				// Request UID
+				response, err := card.Transmit(UID_APDU)
+				if err != nil {
+					log.WithError(err).Debug("Failed while transmitting APDU.")
+					uid = nil
+					continue
+				}
+				scanned_uid := ""
+				for i := 0; i < len(response)-2; i++ {
+					scanned_uid += fmt.Sprintf("%X", response[i])
+				}
+				if len(scanned_uid) > 0 && (uid == nil || *uid != scanned_uid) {
+					uid = &scanned_uid
+					log.Info("Detected RFID token.")
+					callback(*uid)
+				}
+
+				card.Disconnect(scard.UnpowerCard)
+			}
 		}
 	}
+}
+
+// Helpers
+
+func is(mask scard.StateFlag, flag scard.StateFlag) bool {
+	return mask&flag != 0
+}
+
+func announceReaderChanges(log *logrus.Entry, previous []string, current []string) {
+	for _, name := range previous {
+		if !contains(current, name) {
+			log.Info(fmt.Sprintf("Reader became unavailable: '%s'", name))
+		}
+	}
+	for _, name := range current {
+		if !contains(previous, name) {
+			log.Info(fmt.Sprintf("Reader became available: '%s'", name))
+		}
+	}
+}
+
+func contains(arr []string, name string) bool {
+	for _, member := range arr {
+		if member == name {
+			return true
+		}
+	}
+	return false
+}
+
+func makeReaderState(name string, state ...scard.StateFlag) scard.ReaderState {
+	flag := scard.StateUnaware
+	if len(state) == 1 {
+		flag = state[0]
+	}
+	return scard.ReaderState{Reader: name, CurrentState: flag}
 }
