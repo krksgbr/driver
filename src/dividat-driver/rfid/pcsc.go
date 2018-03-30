@@ -39,7 +39,6 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, callback func(string)
 
 	var availableReaders []string = make([]string, 0)
 	var lastKnownState map[string]scard.StateFlag = map[string]scard.StateFlag{}
-	var uid *string
 
 	for {
 
@@ -60,8 +59,6 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, callback func(string)
 
 			// Wait for readers to appear
 			if len(availableReaders) == 0 {
-				uid = nil
-
 				if hasPnP {
 					// `GetStatusChange` acts as a smarter sleep that finishes early
 					pnpReaderStates := []scard.ReaderState{
@@ -94,10 +91,6 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, callback func(string)
 				continue
 			}
 
-			// TODO Maybe the readerStates should outlive the loop and known readers should keep their state?
-			//      Then the `uid` could live within the loop and transmit error would be avoided.
-			//      Problem with this is that we can not watch 100% of the time and could miss state changes in readers.
-			//      Maybe this is not actually a problem: We pass the "current" state, so it should diff wrt that.
 			// One or more readers changed their status
 			for _, readerState := range readerStates {
 				fmt.Println("LOOPING readers")
@@ -125,7 +118,6 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, callback func(string)
 				card, err := scard_ctx.Connect(readerState.Reader, scard.ShareShared, scard.ProtocolAny)
 				if err != nil {
 					log.WithError(err).Error("Error connecting to card.")
-					uid = nil
 					continue
 				}
 
@@ -133,17 +125,15 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, callback func(string)
 				response, err := card.Transmit(UID_APDU)
 				if err != nil {
 					log.WithError(err).Debug("Failed while transmitting APDU.")
-					uid = nil
 					continue
 				}
-				scanned_uid := ""
+				uid := ""
 				for i := 0; i < len(response)-2; i++ {
-					scanned_uid += fmt.Sprintf("%X", response[i])
+					uid += fmt.Sprintf("%X", response[i])
 				}
-				if len(scanned_uid) > 0 && (uid == nil || *uid != scanned_uid) {
-					uid = &scanned_uid
+				if len(uid) > 0 {
 					log.Info("Detected RFID token.")
-					callback(*uid)
+					callback(uid)
 				}
 
 				card.Disconnect(scard.UnpowerCard)
