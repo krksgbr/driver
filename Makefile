@@ -64,7 +64,7 @@ WINDOWS = $(BIN)-windows-amd64
 $(WINDOWS):
 	$(call cross-build,windows,bin/$(WINDOWS).exe)
 
-crossbuild: $(LINUX) $(DARWIN) $(WINDOWS)
+crossbuild: $(LINUX) # $(DARWIN) $(WINDOWS)
 
 
 ### Release ###############################################
@@ -101,21 +101,21 @@ release: crossbuild release/$(CHANNEL)/latest
 	$(call write-signature,$(LINUX_RELEASE))
 
 	# Darwin
-	cp bin/$(DARWIN) $(DARWIN_RELEASE)
-	upx $(DARWIN_RELEASE)
-	$(call write-signature,$(DARWIN_RELEASE))
+	#cp bin/$(DARWIN) $(DARWIN_RELEASE)
+	#upx $(DARWIN_RELEASE)
+	#$ (call write-signature,$(DARWIN_RELEASE))
 
 	# Windows
-	cp bin/$(WINDOWS).exe $(WINDOWS_RELEASE)
-	upx $(WINDOWS_RELEASE)
-	$(call write-signature,$(WINDOWS_RELEASE))
-	osslsigncode sign \
-		-pkcs12 $(CODE_SIGNING_CERT) \
-		-h sha1 \
-		-n "Dividat Driver" \
-		-i "https://www.dividat.com/" \
-		-in $(WINDOWS_RELEASE) \
-		-out $(WINDOWS_RELEASE)
+	#cp bin/$(WINDOWS).exe $(WINDOWS_RELEASE)
+	#upx $(WINDOWS_RELEASE)
+	#\$ (call write-signature,$(WINDOWS_RELEASE))
+	#osslsigncode sign \
+		#-pkcs12 $(CODE_SIGNING_CERT) \
+		#-h sha1 \
+		#-n "Dividat Driver" \
+		#-i "https://www.dividat.com/" \
+		#-in $(WINDOWS_RELEASE) \
+		#-out $(WINDOWS_RELEASE)
 
 
 ### Deploy ################################################
