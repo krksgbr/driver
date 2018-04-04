@@ -6,3 +6,8 @@ describe('General functionality', () => {
 describe('Senso', () => {
   require('./senso')
 })
+
+
+describe('RFID', () => {
+  require('./rfid')
+})

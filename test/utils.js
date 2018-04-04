@@ -1,4 +1,5 @@
 const { spawn } = require('child_process')
+const WebSocket = require('ws')
 const Promise = require('bluebird')
 const rp = require('request-promise')
 
@@ -13,6 +14,16 @@ module.exports = {
     return spawn('bin/dividat-driver')
     // useful for debugging:
     // return spawn('bin/dividat-driver', [], {stdio: 'inherit'})
+  },
+
+  connectWS: function (url) {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(url)
+      ws.on('open', () => {
+        ws.removeAllListeners()
+        resolve(ws)
+      }).on('error', reject)
+    })
   },
 
   getLogs: function () {
