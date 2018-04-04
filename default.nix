@@ -1,11 +1,10 @@
 with import <nixpkgs> {
-  overlays = [ 
+  overlays = [
     (self: super: {
       dep = import ./nix/dep.nix super;
     })
   ];
 };
-
 
 
 stdenv.mkDerivation {
@@ -20,6 +19,10 @@ stdenv.mkDerivation {
       gcc
       # Required for static linking on Linux
       (if stdenv.isDarwin then null else musl)
+
+      # pcsclite
+      pkgconfig
+      (if stdenv.isLinux then pcsclite else null)
 
       # node for tests
       nodejs-8_x
