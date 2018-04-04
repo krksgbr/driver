@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/ebfe/scard"
 	"github.com/sirupsen/logrus"
 )
@@ -20,30 +21,45 @@ const MAGIC_PNP_NAME = "\\\\?PnP?\\Notification"
 var UID_APDU = []byte{0xFF, 0xCA, 0x00, 0x00, 0x00}
 
 func pollSmartCard(ctx context.Context, log *logrus.Entry, callback func(string)) {
-	// Establish a PC/SC context
-	scard_ctx, err := scard.EstablishContext()
-	if err != nil {
-		log.WithError(err).Error("Error EstablishContext:")
+
+	scardContextBackoff := backoff.NewExponentialBackOff()
+	scardContextBackoff.MaxElapsedTime = 0
+	scardContextBackoff.MaxInterval = 2 * time.Minute
+
+	for {
+		// Establish a PC/SC context
+		scard_ctx, err := scard.EstablishContext()
+		if err != nil {
+			log.WithError(err).Error("Could not create smart card context.")
+
+			select {
+			case <-time.After(scardContextBackoff.NextBackOff()):
+				continue
+			case <-ctx.Done():
+				return
+			}
+		}
+		defer scard_ctx.Release()
+
+		// Now we have a context
+		// Detect PnP support
+		pnpReaderStates := []scard.ReaderState{
+			makeReaderState(MAGIC_PNP_NAME),
+		}
+		scard_ctx.GetStatusChange(pnpReaderStates, 0)
+		hasPnP := !is(pnpReaderStates[0].EventState, scard.StateUnknown)
+
+		log.WithField("pnp", hasPnP).Info("Starting RFID scanner.")
+
+		go waitForCardActivity(log, scard_ctx, hasPnP, callback)
+
+		<-ctx.Done()
+		// Cancel `GetStatusChange`
+		scard_ctx.Cancel()
+
+		log.Info("Stopping RFID scanner.")
 		return
 	}
-	defer scard_ctx.Release()
-
-	// Detect PnP support
-	pnpReaderStates := []scard.ReaderState{
-		makeReaderState(MAGIC_PNP_NAME),
-	}
-	scard_ctx.GetStatusChange(pnpReaderStates, 0)
-	hasPnP := !is(pnpReaderStates[0].EventState, scard.StateUnknown)
-
-	log.WithField("pnp", hasPnP).Info("Starting RFID scanner.")
-
-	go waitForCardActivity(log, scard_ctx, hasPnP, callback)
-
-	<-ctx.Done()
-	// Cancel `GetStatusChange`
-	scard_ctx.Cancel()
-
-	log.Info("Stopping RFID scanner.")
 }
 
 func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP bool, callback func(string)) {
@@ -54,8 +70,8 @@ func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP boo
 		// Retrieve available readers
 		newReaders, err := scard_ctx.ListReaders()
 		if err != nil {
-			log.WithError(err).Error("Error listing readers.")
-			return
+			// TODO With pcsclite this fails if there are no smart card readers. Too noisy.
+			log.WithError(err).Debug("Error listing readers.")
 		}
 		announceReaderChanges(log, availableReaders, newReaders)
 		availableReaders = newReaders
@@ -153,19 +169,6 @@ func is(mask scard.StateFlag, flag scard.StateFlag) bool {
 	return mask&flag != 0
 }
 
-func announceReaderChanges(log *logrus.Entry, previous []string, current []string) {
-	for _, name := range previous {
-		if !contains(current, name) {
-			log.Info(fmt.Sprintf("Reader became unavailable: '%s'", name))
-		}
-	}
-	for _, name := range current {
-		if !contains(previous, name) {
-			log.Info(fmt.Sprintf("Reader became available: '%s'", name))
-		}
-	}
-}
-
 func contains(arr []string, name string) bool {
 	for _, member := range arr {
 		if member == name {
@@ -181,4 +184,17 @@ func makeReaderState(name string, state ...scard.StateFlag) scard.ReaderState {
 		flag = state[0]
 	}
 	return scard.ReaderState{Reader: name, CurrentState: flag}
+}
+
+func announceReaderChanges(log *logrus.Entry, previous []string, current []string) {
+	for _, name := range previous {
+		if !contains(current, name) {
+			log.Info(fmt.Sprintf("Reader became unavailable: '%s'", name))
+		}
+	}
+	for _, name := range current {
+		if !contains(previous, name) {
+			log.Info(fmt.Sprintf("Reader became available: '%s'", name))
+		}
+	}
 }
