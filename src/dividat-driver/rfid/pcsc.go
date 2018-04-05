@@ -20,7 +20,7 @@ const MAGIC_PNP_NAME = "\\\\?PnP?\\Notification"
 // APDU to retrieve a card's UID
 var UID_APDU = []byte{0xFF, 0xCA, 0x00, 0x00, 0x00}
 
-func pollSmartCard(ctx context.Context, log *logrus.Entry, callback func(string)) {
+func pollSmartCard(ctx context.Context, log *logrus.Entry, onToken func(string), onReadersChange func([]string)) {
 
 	scardContextBackoff := backoff.NewExponentialBackOff()
 	scardContextBackoff.MaxElapsedTime = 0
@@ -51,7 +51,7 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, callback func(string)
 
 		log.WithField("pnp", hasPnP).Info("Starting RFID scanner.")
 
-		go waitForCardActivity(log, scard_ctx, hasPnP, callback)
+		go waitForCardActivity(log, scard_ctx, hasPnP, onToken, onReadersChange)
 
 		<-ctx.Done()
 		// Cancel `GetStatusChange`
@@ -62,7 +62,7 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, callback func(string)
 	}
 }
 
-func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP bool, callback func(string)) {
+func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP bool, onToken func(string), onReadersChange func([]string)) {
 	availableReaders := make([]string, 0)
 	lastKnownState := map[string]scard.StateFlag{}
 
@@ -73,7 +73,7 @@ func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP boo
 			// TODO With pcsclite this fails if there are no smart card readers. Too noisy.
 			log.WithError(err).Debug("Error listing readers.")
 		}
-		announceReaderChanges(log, availableReaders, newReaders)
+		announceReaderChanges(log, onReadersChange, availableReaders, newReaders)
 		availableReaders = newReaders
 
 		// Wait for readers to appear
@@ -155,7 +155,7 @@ func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP boo
 			}
 			if len(uid) > 0 {
 				log.Info("Detected RFID token.")
-				callback(uid)
+				onToken(uid)
 			}
 
 			card.Disconnect(scard.UnpowerCard)
@@ -186,15 +186,30 @@ func makeReaderState(name string, state ...scard.StateFlag) scard.ReaderState {
 	return scard.ReaderState{Reader: name, CurrentState: flag}
 }
 
-func announceReaderChanges(log *logrus.Entry, previous []string, current []string) {
+func announceReaderChanges(log *logrus.Entry, onReadersChange func([]string), previous []string, current []string) {
+	hasListChanged := false
 	for _, name := range previous {
 		if !contains(current, name) {
+			hasListChanged = true
 			log.Info(fmt.Sprintf("Reader became unavailable: '%s'", name))
 		}
 	}
 	for _, name := range current {
 		if !contains(previous, name) {
+			hasListChanged = true
 			log.Info(fmt.Sprintf("Reader became available: '%s'", name))
 		}
+	}
+
+	if hasListChanged {
+		onReadersChange(normalizeReaderList(current))
+	}
+}
+
+func normalizeReaderList(readers []string) []string {
+	if readers == nil {
+		return []string{}
+	} else {
+		return readers
 	}
 }

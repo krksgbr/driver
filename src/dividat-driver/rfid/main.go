@@ -2,14 +2,14 @@ package rfid
 
 import (
 	"context"
-	"time"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"sync"
+	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/cskr/pubsub"
+	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,8 +22,9 @@ type Handle struct {
 
 	ctx context.Context
 
-	cancelPolling context.CancelFunc
+	cancelPolling   context.CancelFunc
 	subscriberCount int
+	knownReaders    *[]string
 
 	log *logrus.Entry
 }
@@ -31,8 +32,8 @@ type Handle struct {
 func NewHandle(ctx context.Context, log *logrus.Entry) *Handle {
 	handle := Handle{
 		broker: pubsub.New(2),
-		ctx: ctx,
-		log: log,
+		ctx:    ctx,
+		log:    log,
 	}
 
 	// Clean up
@@ -58,32 +59,47 @@ func (handle *Handle) EnsureSmartCardPolling() {
 		ctx, cancel := context.WithCancel(handle.ctx)
 		handle.cancelPolling = cancel
 		// Start a polling routine and push any tokens it produces onto the bus
-		go pollSmartCard(ctx, handle.log, func(token string) {
-			handle.broker.TryPub(Message{ Identified: &token }, Topic)
-		})
+		go pollSmartCard(
+			ctx,
+			handle.log,
+			func(token string) {
+				handle.broker.TryPub(Message{Identified: &token}, Topic)
+			},
+			func(knownReaders []string) {
+				handle.knownReaders = &knownReaders
+				handle.broker.TryPub(Message{ReadersChanged: &knownReaders}, Topic)
+			},
+		)
 	}
 
 	handle.subscriberCount++
 }
 
-
 // WEBSOCKET PROTOCOL
 
 // Message that can be sent to Play
 type Message struct {
-	Identified *string
+	Identified     *string
+	ReadersChanged *[]string
 }
 
 func (message *Message) MarshalJSON() ([]byte, error) {
 	if message.Identified != nil {
 		return json.Marshal(&struct {
-			Type   string  `json:"type"`
-			Token *string `json:"token"`
+			Type  string `json:"type"`
+			Token string `json:"token"`
 		}{
-			Type:    "Identified",
-			Token: message.Identified,
+			Type:  "Identified",
+			Token: *message.Identified,
 		})
-
+	} else if message.ReadersChanged != nil {
+		return json.Marshal(&struct {
+			Type    string   `json:"type"`
+			Readers []string `json:"readers"`
+		}{
+			Type:    "ReadersChanged",
+			Readers: *message.ReadersChanged,
+		})
 	}
 
 	return nil, errors.New("could not marshal message")
@@ -115,8 +131,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Subscribe to tokens and proxy received messages
-	rx := handle.broker.Sub(Topic)
-	go rx_data_loop(ctx, rx, func(message Message) error {
+	send := func(message Message) error {
 		writeMutex.Lock()
 		conn.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
 		err := conn.WriteJSON(&message)
@@ -128,7 +143,9 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		return nil
-	})
+	}
+	rx := handle.broker.Sub(Topic)
+	go rx_data_loop(ctx, rx, send)
 
 	// Helper function to close the connection
 	close := func() {
@@ -143,6 +160,11 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		handle.DeregisterSubscriber()
 
 		log.Info("WebSocket connection closed")
+	}
+
+	// Send initial list of readers if it has been set
+	if *handle.knownReaders != nil {
+		send(Message{ReadersChanged: handle.knownReaders})
 	}
 
 	// Main loop for the WebSocket connection
