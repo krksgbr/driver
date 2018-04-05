@@ -15,6 +15,10 @@ stdenv.mkDerivation {
       go_1_9
       dep
 
+      gcc
+      # Required for static linking on Linux
+      (if stdenv.isDarwin then null else musl)
+
       # node for tests
       nodejs-8_x
     ];

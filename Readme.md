@@ -52,6 +52,14 @@ Firefox, Safari and Edge not supported as they are not yet properly implementing
 
 Run the test suite with: `make test`.
 
+## Releasing
+
+Currently releases can only be made for Linux (from Linux). Builds on Linux are statically linked with [musl](https://www.musl-libc.org/).
+
+To create a release run: `make release`. You will need to be able to provide appropriate signing keys.
+
+To deploy a new release run: `make deploy`. This can only be done if you are on `master` or `develop` branch, have correctly tagged the revision and have AWS credentials set in your environment.
+
 ## Tools
 
 ### Data replayer
