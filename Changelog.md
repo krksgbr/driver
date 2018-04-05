@@ -1,6 +1,6 @@
 # Change Log
 
-## [2.0.0] - 2018-04-04
+## [UNRELEASED]
 
 - Reimplementation of driver in Go with major design overhauls
 
