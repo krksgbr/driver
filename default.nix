@@ -21,5 +21,8 @@ stdenv.mkDerivation {
 
       # node for tests
       nodejs-8_x
+
+      # for deployment to S3
+      awscli
     ];
 }
