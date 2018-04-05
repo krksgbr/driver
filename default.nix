@@ -14,6 +14,8 @@ stdenv.mkDerivation {
     buildInputs = [
       go_1_9
       dep
+      # Git is a de facto dependency of dep
+      git
 
       gcc
       # Required for static linking on Linux
