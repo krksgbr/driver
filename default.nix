@@ -23,6 +23,9 @@ stdenv.mkDerivation {
 
         # for deployment to S3
         awscli
+
+        # PCSC on Darwin
+        (if stdenv.isDarwin then pkgs.darwin.apple_sdk.frameworks.PCSC else null)
       ]
       ++
       (if stdenv.isLinux then
