@@ -19,6 +19,7 @@ const MAGIC_PNP_NAME = "\\\\?PnP?\\Notification"
 
 // APDU to retrieve a card's UID
 var UID_APDU = []byte{0xFF, 0xCA, 0x00, 0x00, 0x00}
+var NO_BUZZ_APDU = []byte{0xFF, 0x00, 0x52, 0x00, 0x00}
 
 func pollSmartCard(ctx context.Context, log *logrus.Entry, onToken func(string), onReadersChange func([]string)) {
 
@@ -168,10 +169,20 @@ func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP boo
 				continue
 			}
 
+			// Turn off buzzer for the lifetime of the connection to the reader. Most
+			// drivers don't allow transmission of commands without a card present, so
+			// this will silence all but the first buzz during the connection's
+			// lifetime.
+			_, err = card.Transmit(NO_BUZZ_APDU)
+			if err != nil {
+				log.WithError(err).Debug("Failed while transmitting silencer APDU.")
+				continue
+			}
+
 			// Request UID
 			response, err := card.Transmit(UID_APDU)
 			if err != nil {
-				log.WithError(err).Debug("Failed while transmitting APDU.")
+				log.WithError(err).Debug("Failed while transmitting UID APDU.")
 				continue
 			}
 			uid := ""
