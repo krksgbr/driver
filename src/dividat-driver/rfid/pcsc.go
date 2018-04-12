@@ -63,8 +63,34 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, onToken func(string),
 }
 
 func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP bool, onToken func(string), onReadersChange func([]string)) {
-	availableReaders := make([]string, 0)
-	lastKnownState := map[string]scard.StateFlag{}
+	knownReaders := map[string]ReaderProfile{}
+
+	updateKnownReaders := func(log *logrus.Entry, onReadersChange func([]string), current []string) {
+		hasListChanged := false
+		// Detect reader removal
+		for name := range knownReaders {
+			if !contains(current, name) {
+				delete(knownReaders, name)
+				log.Info(fmt.Sprintf("Reader became unavailable: '%s'", name))
+				hasListChanged = true
+			}
+		}
+		// Detect reader appearance
+		for _, name := range current {
+			if _, present := knownReaders[name]; !present {
+				knownReaders[name] = ReaderProfile{
+					lastKnownState: scard.StateUnknown,
+					lastKnownToken: nil,
+				}
+				log.Info(fmt.Sprintf("Reader became available: '%s'", name))
+				hasListChanged = true
+			}
+		}
+
+		if hasListChanged {
+			onReadersChange(normalizeReaderList(current))
+		}
+	}
 
 	for {
 		// Retrieve available readers
@@ -73,11 +99,10 @@ func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP boo
 			// TODO With pcsclite this fails if there are no smart card readers. Too noisy.
 			log.WithError(err).Debug("Error listing readers.")
 		}
-		announceReaderChanges(log, onReadersChange, availableReaders, newReaders)
-		availableReaders = newReaders
+		updateKnownReaders(log, onReadersChange, newReaders)
 
 		// Wait for readers to appear
-		if len(availableReaders) == 0 {
+		if len(knownReaders) == 0 {
 			if hasPnP {
 				// `GetStatusChange` acts as a smarter sleep that finishes early
 				code := scard_ctx.GetStatusChange(
@@ -97,14 +122,10 @@ func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP boo
 
 		// Now there are available readers
 		// Wait for card presence
-		readerStates := make([]scard.ReaderState, len(availableReaders))
-		for ix, readerName := range availableReaders {
-			flag, ok := lastKnownState[readerName]
-			if ok {
-				readerStates[ix] = makeReaderState(readerName, flag)
-			} else {
-				readerStates[ix] = makeReaderState(readerName)
-			}
+		readerStates := []scard.ReaderState{}
+		for readerName, readerProfile := range knownReaders {
+			// Restore last known state
+			readerStates = append(readerStates, makeReaderState(readerName, readerProfile.lastKnownState))
 		}
 		// We need to timeout perodically to check for new readers
 		code := scard_ctx.GetStatusChange(readerStates, CARD_POLLING_TIMEOUT)
@@ -122,17 +143,20 @@ func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP boo
 				continue
 			}
 
+			profile := knownReaders[readerState.Reader]
+
 			if is(readerState.EventState, scard.StateChanged) {
 				// Event state becomes current state
 				readerState.CurrentState = readerState.EventState
 				// Keep track of last known state for next refresh cycle
-				lastKnownState[readerState.Reader] = readerState.CurrentState
+				knownReaders[readerState.Reader] = profile.withState(readerState.CurrentState)
 			} else {
 				continue
 			}
 
 			if !is(readerState.CurrentState, scard.StatePresent) {
 				// This reader has no card.
+				knownReaders[readerState.Reader] = makeEmptyProfile()
 				continue
 			}
 
@@ -140,6 +164,7 @@ func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP boo
 			card, err := scard_ctx.Connect(readerState.Reader, scard.ShareShared, scard.ProtocolAny)
 			if err != nil {
 				log.WithError(err).Error("Error connecting to card.")
+				knownReaders[readerState.Reader] = makeEmptyProfile()
 				continue
 			}
 
@@ -153,14 +178,36 @@ func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP boo
 			for i := 0; i < len(response)-2; i++ {
 				uid += fmt.Sprintf("%X", response[i])
 			}
-			if len(uid) > 0 {
+			if len(uid) > 0 && (profile.lastKnownToken == nil || *profile.lastKnownToken != uid) {
 				log.Info("Detected RFID token.")
+				knownReaders[readerState.Reader] = profile.withToken(&uid)
 				onToken(uid)
 			}
 
 			card.Disconnect(scard.UnpowerCard)
 		}
 	}
+}
+
+type ReaderProfile struct {
+	// Reuse last known state when querying for state changes.
+	lastKnownState scard.StateFlag
+	// PC/SC implementation on Windows can emit multiple distinct states for
+	// a single touch-on. We store detected card IDs to deduplicate token stream
+	// for subscribers.
+	lastKnownToken *string
+}
+
+func makeEmptyProfile() ReaderProfile {
+	return ReaderProfile{lastKnownState: scard.StateUnknown, lastKnownToken: nil}
+}
+
+func (profile ReaderProfile) withState(flag scard.StateFlag) ReaderProfile {
+	return ReaderProfile{lastKnownState: flag, lastKnownToken: profile.lastKnownToken}
+}
+
+func (profile ReaderProfile) withToken(token *string) ReaderProfile {
+	return ReaderProfile{lastKnownState: profile.lastKnownState, lastKnownToken: token}
 }
 
 // Helpers
@@ -184,26 +231,6 @@ func makeReaderState(name string, state ...scard.StateFlag) scard.ReaderState {
 		flag = state[0]
 	}
 	return scard.ReaderState{Reader: name, CurrentState: flag}
-}
-
-func announceReaderChanges(log *logrus.Entry, onReadersChange func([]string), previous []string, current []string) {
-	hasListChanged := false
-	for _, name := range previous {
-		if !contains(current, name) {
-			hasListChanged = true
-			log.Info(fmt.Sprintf("Reader became unavailable: '%s'", name))
-		}
-	}
-	for _, name := range current {
-		if !contains(previous, name) {
-			hasListChanged = true
-			log.Info(fmt.Sprintf("Reader became available: '%s'", name))
-		}
-	}
-
-	if hasListChanged {
-		onReadersChange(normalizeReaderList(current))
-	}
 }
 
 func normalizeReaderList(readers []string) []string {
