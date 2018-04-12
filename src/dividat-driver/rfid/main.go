@@ -163,7 +163,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send initial list of readers if it has been set
-	if *handle.knownReaders != nil {
+	if handle.knownReaders != nil {
 		send(Message{ReadersChanged: handle.knownReaders})
 	}
 
