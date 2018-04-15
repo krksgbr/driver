@@ -27,6 +27,8 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, onToken func(string),
 	scardContextBackoff.MaxElapsedTime = 0
 	scardContextBackoff.MaxInterval = 2 * time.Minute
 
+	haveBeenKilled := false
+
 	for {
 		// Establish a PC/SC context
 		scard_ctx, err := scard.EstablishContext()
@@ -37,6 +39,7 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, onToken func(string),
 			case <-time.After(scardContextBackoff.NextBackOff()):
 				continue
 			case <-ctx.Done():
+				haveBeenKilled = true
 				return
 			}
 		}
@@ -52,18 +55,19 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, onToken func(string),
 
 		log.WithField("pnp", hasPnP).Info("Starting RFID scanner.")
 
-		go waitForCardActivity(log, scard_ctx, hasPnP, onToken, onReadersChange)
+		go waitForCardActivity(&haveBeenKilled, log, scard_ctx, hasPnP, onToken, onReadersChange)
 
 		<-ctx.Done()
 		// Cancel `GetStatusChange`
 		scard_ctx.Cancel()
+		haveBeenKilled = true
 
 		log.Info("Stopping RFID scanner.")
 		return
 	}
 }
 
-func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP bool, onToken func(string), onReadersChange func([]string)) {
+func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *scard.Context, hasPnP bool, onToken func(string), onReadersChange func([]string)) {
 	knownReaders := map[string]ReaderProfile{}
 
 	updateKnownReaders := func(log *logrus.Entry, onReadersChange func([]string), current []string) {
@@ -94,6 +98,10 @@ func waitForCardActivity(log *logrus.Entry, scard_ctx *scard.Context, hasPnP boo
 	}
 
 	for {
+		if *haveBeenKilled {
+			return
+		}
+
 		// Retrieve available readers
 		newReaders, err := scard_ctx.ListReaders()
 		if err != nil {
