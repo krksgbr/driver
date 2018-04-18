@@ -41,6 +41,10 @@ function listenForConnection (host, port) {
     console.log('Listening on ' + host + ':' + port)
     var server = net.createServer((socket) => {
       console.log('Connection: ' + socket.remoteAddress + ':' + socket.remotePort)
+
+      // disable Nagle
+      socket.setNoDelay()
+
       // Only allow one connection at a time
       server.close()
       resolve(socket)
