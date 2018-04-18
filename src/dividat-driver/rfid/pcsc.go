@@ -152,20 +152,20 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 				continue
 			}
 
-			profile := knownReaders[readerState.Reader]
-
 			if is(readerState.EventState, scard.StateChanged) {
 				// Event state becomes current state
 				readerState.CurrentState = readerState.EventState
 				// Keep track of last known state for next refresh cycle
-				knownReaders[readerState.Reader] = profile.withState(readerState.CurrentState)
+				knownReaders[readerState.Reader] =
+					knownReaders[readerState.Reader].withState(readerState.CurrentState)
 			} else {
 				continue
 			}
 
 			if !is(readerState.CurrentState, scard.StatePresent) {
 				// This reader has no card.
-				knownReaders[readerState.Reader] = makeEmptyProfile()
+				knownReaders[readerState.Reader] =
+					knownReaders[readerState.Reader].withToken(nil)
 				continue
 			}
 
@@ -173,7 +173,10 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 			card, err := scard_ctx.Connect(readerState.Reader, scard.ShareShared, scard.ProtocolAny)
 			if err != nil {
 				log.WithError(err).Error("Error connecting to card.")
-				knownReaders[readerState.Reader] = makeEmptyProfile()
+				knownReaders[readerState.Reader] = ReaderProfile{
+					lastKnownState: scard.StateUnknown,
+					lastKnownToken: nil,
+				}
 				continue
 			}
 
@@ -197,6 +200,7 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 			for i := 0; i < len(response)-2; i++ {
 				uid += fmt.Sprintf("%X", response[i])
 			}
+			profile := knownReaders[readerState.Reader]
 			if len(uid) > 0 && (profile.lastKnownToken == nil || *profile.lastKnownToken != uid) {
 				log.Info("Detected RFID token.")
 				knownReaders[readerState.Reader] = profile.withToken(&uid)
@@ -215,10 +219,6 @@ type ReaderProfile struct {
 	// a single touch-on. We store detected card IDs to deduplicate token stream
 	// for subscribers.
 	lastKnownToken *string
-}
-
-func makeEmptyProfile() ReaderProfile {
-	return ReaderProfile{lastKnownState: scard.StateUnknown, lastKnownToken: nil}
 }
 
 func (profile ReaderProfile) withState(flag scard.StateFlag) ReaderProfile {
