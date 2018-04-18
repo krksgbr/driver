@@ -59,7 +59,8 @@ function devInfo (profile) {
 
   return Buffer.concat([header,
     lenType,
-    devInfoItem(profile.board_serial_numbers.controller),
+    // The controller dev_info_item holds the device serial number and not the controller serial number!
+    devInfoItem(profile.serial_number),
     devInfoItem(profile.board_serial_numbers.led_boards.center),
     devInfoItem(profile.board_serial_numbers.led_boards.up),
     devInfoItem(profile.board_serial_numbers.led_boards.right),
