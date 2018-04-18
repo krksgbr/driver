@@ -24,16 +24,17 @@ type Handle struct {
 
 	cancelPolling   context.CancelFunc
 	subscriberCount int
-	knownReaders    *[]string
+	knownReaders    []string
 
 	log *logrus.Entry
 }
 
 func NewHandle(ctx context.Context, log *logrus.Entry) *Handle {
 	handle := Handle{
-		broker: pubsub.New(2),
-		ctx:    ctx,
-		log:    log,
+		broker:       pubsub.New(2),
+		ctx:          ctx,
+		log:          log,
+		knownReaders: []string{},
 	}
 
 	// Clean up
@@ -66,7 +67,7 @@ func (handle *Handle) EnsureSmartCardPolling() {
 				handle.broker.TryPub(Message{Identified: &token}, Topic)
 			},
 			func(knownReaders []string) {
-				handle.knownReaders = &knownReaders
+				handle.knownReaders = knownReaders
 				handle.broker.TryPub(Message{ReadersChanged: &knownReaders}, Topic)
 			},
 		)
@@ -106,6 +107,27 @@ func (message *Message) MarshalJSON() ([]byte, error) {
 }
 
 func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" && r.URL.Path == "/rfid/readers" {
+		handle.ServerReaderList(w, r)
+	} else if r.URL.Path == "/rfid" || r.URL.Path == "/rfid/" {
+		handle.StreamEvents(w, r)
+	} else {
+		http.NotFound(w, r)
+	}
+}
+
+func (handle *Handle) ServerReaderList(w http.ResponseWriter, r *http.Request) {
+	readersJson, _ := json.Marshal(&struct {
+		Readers []string `json:"readers"`
+	}{
+		Readers: handle.knownReaders,
+	})
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(readersJson)
+}
+
+func (handle *Handle) StreamEvents(w http.ResponseWriter, r *http.Request) {
 	handle.EnsureSmartCardPolling()
 
 	// Set up logger
@@ -162,11 +184,6 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Info("WebSocket connection closed")
 	}
 
-	// Send initial list of readers if it has been set
-	if handle.knownReaders != nil {
-		send(Message{ReadersChanged: handle.knownReaders})
-	}
-
 	// Main loop for the WebSocket connection
 	go func() {
 		defer close()
@@ -182,7 +199,6 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		}
 	}()
-
 }
 
 func rx_data_loop(ctx context.Context, rx chan interface{}, send func(Message) error) {

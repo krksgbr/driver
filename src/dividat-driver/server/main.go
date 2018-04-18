@@ -69,7 +69,9 @@ func Start(interactive bool) context.CancelFunc {
 
 	// Setup RFID scanner
 	rfidHandle := rfid.NewHandle(ctx, baseLog.WithField("package", "rfid"))
+	// net/http performs a redirect from `/rfid` if only `/rfid/` is mounted
 	http.Handle("/rfid", rfidHandle)
+	http.Handle("/rfid/", rfidHandle)
 
 	// Create a logger for server
 	log := baseLog.WithField("package", "server")
