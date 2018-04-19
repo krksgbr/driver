@@ -79,7 +79,7 @@ WINDOWS = $(BIN)-windows-amd64
 $(WINDOWS):
 	$(call cross-build,windows,bin/$(WINDOWS).exe)
 
-crossbuild: $(LINUX) # $(DARWIN) $(WINDOWS)
+crossbuild: deps $(LINUX) # $(DARWIN) $(WINDOWS)
 
 
 ### Release ###############################################
