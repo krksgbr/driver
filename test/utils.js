@@ -26,8 +26,8 @@ module.exports = {
     })
   },
 
-  getLogs: function () {
-    return rp({uri: 'http://127.0.0.1:8382/log', json: true})
+  getJSON: function (uri) {
+    return rp({uri: uri, json: true})
   },
 
   expectEvent: function (emitter, event, filter) {

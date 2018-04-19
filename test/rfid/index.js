@@ -1,5 +1,5 @@
 /* eslint-env mocha */
-const { wait, startDriver, connectWS, expectEvent } = require('../utils')
+const { wait, startDriver, connectWS, getJSON, expectEvent } = require('../utils')
 const expect = require('chai').expect
 const Promise = require('bluebird')
 
@@ -23,6 +23,13 @@ describe('Basic functionality', () => {
 
   afterEach(() => {
     driver.kill()
+  })
+
+  it('Can retrieve current reader list.', async function () {
+    this.timeout(500)
+
+    const response = await getJSON('http://127.0.0.1:8382/rfid/readers')
+    expect(response.readers).to.be.an('array')
   })
 
   it('Can connect to the RFID endpoint.', async function () {
