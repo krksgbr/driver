@@ -47,7 +47,7 @@ CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 ### Simple build ##########################################
 .PHONY: $(BIN)
 $(BIN): deps
-	GOROOT=$(GOROOT) GOPATH=$(GOPATH) CC=$(CC) CXX=$(CXX) go build $(GO_LDFLAGS) $(GO_CFLAGS) -o bin/$(BIN) $(SRC)
+	GOROOT=$(GOROOT) GOPATH=$(GOPATH) CC=$(CC) CXX=$(CXX) go build $(GO_LDFLAGS) -o bin/$(BIN) $(SRC)
 
 
 ### Test suite ##########################################
