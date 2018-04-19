@@ -28,11 +28,15 @@ CC := gcc
 CXX := g++
 
 # Force static linking on Linux
+PCSCLITE_DIR := $(CWD)libpcsclite
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
 	STATIC_LINKING_LDFLAGS := -linkmode external -extldflags \"-static\"
 	CC := musl-gcc
 	CXX := musl-gcc
+
+	LIB_PCSCLITE := $(PCSCLITE_DIR)
+	export PKG_CONFIG_PATH=$(PCSCLITE_DIR)/lib/pkgconfig:$$PKG_CONFIG_PATH
 endif
 
 GO_LDFLAGS = -ldflags "$(STATIC_LINKING_LDFLAGS) -X dividat-driver/server.channel=$(CHANNEL) -X dividat-driver/server.version=$(VERSION) -X dividat-driver/update.releaseUrl=$(RELEASE_URL)"
@@ -152,10 +156,29 @@ deploy: release
 
 
 ### Dependencies and cleanup ##############################
-deps:
+deps: $(LIB_PCSCLITE)
 	cd src/$(BIN) && dep ensure
+
+$(PCSCLITE_DIR):
+	curl -LO https://github.com/LudovicRousseau/PCSC/archive/pcsc-1.8.23.tar.gz
+	mkdir -p tmp/pcsclite && tar xzf pcsc-1.8.23.tar.gz -C tmp/pcsclite --strip-components=1
+	cd tmp/pcsclite; \
+		./bootstrap; \
+		CC=musl-gcc ./configure \
+			--enable-static \
+			--prefix=$(PCSCLITE_DIR) \
+			--with-systemdsystemunitdir=$(PCSCLITE_DIR)/lib/systemd/system \
+			--disable-libudev \
+			--disable-libusb \
+			--disable-libsystemd; \
+		make; \
+		make install
+	rm -rf tmp/pcsclite
+	rm pcsc-1.8.23.tar.gz
+
 
 clean:
 	rm -rf release/
+	rm -rf $(PCSCLITE_DIR)
 	rm -f $(CHECK_VERSION_BIN)
 	go clean

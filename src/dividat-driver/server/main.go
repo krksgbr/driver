@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"dividat-driver/logging"
+	"dividat-driver/rfid"
 	"dividat-driver/senso"
 	"dividat-driver/update"
 )
@@ -65,6 +66,12 @@ func Start(interactive bool) context.CancelFunc {
 	// Setup Senso
 	sensoHandle := senso.New(ctx, baseLog.WithField("package", "senso"))
 	http.Handle("/senso", sensoHandle)
+
+	// Setup RFID scanner
+	rfidHandle := rfid.NewHandle(ctx, baseLog.WithField("package", "rfid"))
+	// net/http performs a redirect from `/rfid` if only `/rfid/` is mounted
+	http.Handle("/rfid", rfidHandle)
+	http.Handle("/rfid/", rfidHandle)
 
 	// Create a logger for server
 	log := baseLog.WithField("package", "server")

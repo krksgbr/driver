@@ -1,30 +1,9 @@
 /* eslint-env mocha */
-const { wait, startDriver, expectEvent } = require('../utils')
+const { wait, startDriver, connectWS, expectEvent } = require('../utils')
 const expect = require('chai').expect
-const WebSocket = require('ws')
 const Promise = require('bluebird')
 
 const mock = require('./mock')
-// HELPERS
-
-// Connect to the Senso WS endpoint
-function connectSensoWS () {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket('ws://127.0.0.1:8382/senso')
-    ws.on('open', () => {
-      ws.removeAllListeners()
-      resolve(ws)
-    }).on('error', reject)
-  })
-}
-
-// Returns a promise that is resolved with a new connection to a server
-function getConnection (server) {
-  return new Promise((resolve, reject) => {
-    server.on('connection', (c) => resolve(c))
-          .on('error', (e) => reject(e))
-  })
-}
 
 // TESTS
 
@@ -74,7 +53,7 @@ describe('Basic functionality', () => {
     // It takes at least 1s to connect (as driver waits one sec between data and control connection)
     this.timeout(1500)
 
-    await connectSensoWS()
+    await connectWS('ws://127.0.0.1:8382/senso')
     .then(connectWithMockSenso)
   })
 
@@ -82,7 +61,7 @@ describe('Basic functionality', () => {
     // It takes at least 1s to connect (as driver waits one sec between data and control connection)
     this.timeout(1500)
 
-    var ws = await connectSensoWS()
+    var ws = await connectWS('ws://127.0.0.1:8382/senso')
 
     var cmd = JSON.stringify({
       type: 'Connect',
@@ -119,7 +98,7 @@ describe('Basic functionality', () => {
     // It takes at least 1s to connect (as driver waits one sec between data and control connection)
     this.timeout(1500)
 
-    var ws = await connectSensoWS()
+    var ws = await connectWS('ws://127.0.0.1:8382/senso')
 
     var cmd = JSON.stringify({
       type: 'Connect',
@@ -156,7 +135,7 @@ describe('Basic functionality', () => {
   it('Can get connection status', async function () {
     this.timeout(500)
 
-    const sensoWS = await connectSensoWS()
+    const sensoWS = await connectWS('ws://127.0.0.1:8382/senso')
     .then((ws) => {
       const cmd = JSON.stringify({
         type: 'GetStatus'
@@ -173,7 +152,7 @@ describe('Basic functionality', () => {
   })
 
   it('Data is forwarded from Senso data channel to WS', async function () {
-    const sensoWS = await connectSensoWS().then(connectWithMockSenso)
+    const sensoWS = await connectWS('ws://127.0.0.1:8382/senso').then(connectWithMockSenso)
 
     const chunkSize = 64
     const n = 1000
@@ -201,7 +180,7 @@ describe('Basic functionality', () => {
   })
 
   it('Data is forwarded from WS to control channel', async function () {
-    const sensoWS = await connectSensoWS()
+    const sensoWS = await connectWS('ws://127.0.0.1:8382/senso')
     sensoWS.send(JSON.stringify({
       type: 'Connect',
       address: '127.0.0.1'
@@ -238,7 +217,7 @@ describe('Basic functionality', () => {
     this.timeout(6000)
 
     // connect with Senso WS
-    const sensoWS = await connectSensoWS()
+    const sensoWS = await connectWS('ws://127.0.0.1:8382/senso')
 
     // start fake mdns responder
     const bonjour = require('bonjour')()
@@ -260,3 +239,13 @@ describe('Basic functionality', () => {
     return expectDiscovered
   })
 })
+
+// HELPERS
+
+// Returns a promise that is resolved with a new connection to a server
+function getConnection (server) {
+  return new Promise((resolve, reject) => {
+    server.on('connection', (c) => resolve(c))
+          .on('error', (e) => reject(e))
+  })
+}

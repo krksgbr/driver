@@ -1,7 +1,6 @@
 /* eslint-env mocha */
 
-const { wait, getLogs, startDriver } = require('./utils')
-const rp = require('request-promise')
+const { wait, getJSON, startDriver } = require('./utils')
 const expect = require('chai').expect
 
 var driver
@@ -21,7 +20,7 @@ afterEach(() => {
 })
 
 it('Get message and version with HTTP get.', async () => {
-  return rp({uri: 'http://127.0.0.1:8382/', json: true})
+  return getJSON('http://127.0.0.1:8382')
   .then((response) => {
     expect(response).to.have.property('message').equal('Dividat Driver')
     expect(response).to.have.property('version')
@@ -37,7 +36,7 @@ it('Opening a second instance of the driver fails.', (done) => {
 })
 
 it('Get log entries from HTTP endpoint.', async () => {
-  const logs = await getLogs()
+  const logs = await getJSON('http://127.0.0.1:8382/log')
   expect(logs).to.be.an('array')
   expect(logs[0]).to.include({level: 'info', msg: 'Dividat Driver starting'})
 })
