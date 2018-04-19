@@ -21,6 +21,8 @@ stdenv.mkDerivation {
         # node for tests
         nodejs-8_x
 
+        # for building releases
+        openssl upx
         # for deployment to S3
         awscli
 
