@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/sirupsen/logrus"
@@ -24,15 +23,7 @@ var channel string
 const serverPort = "8382"
 
 // Start the driver server
-func Start(interactive bool) context.CancelFunc {
-
-	// Set up logging
-	logger := logrus.New()
-	if !interactive {
-		logger.Out = ioutil.Discard
-	}
-	logger.SetLevel(logrus.DebugLevel)
-
+func Start(logger *logrus.Logger) context.CancelFunc {
 	// Log Server
 	logServer := logging.NewLogServer()
 	logger.AddHook(logServer)
