@@ -144,6 +144,14 @@ deploy: release
 	# Check if version is in semver format
 	[[ $(VERSION) =~ $(SEMVER_REGEX) ]]
 
+	# Print information about channel heads and confirm
+	@echo "Channel 'master' is at:"
+	@echo "  $(shell git show --oneline --decorate --quiet $$(curl -s "$(RELEASE_URL)master/latest" | tr -d '\n') | tail -1)"
+	@echo "Channel 'develop' is at:"
+	@echo "  $(shell git show --oneline --decorate --quiet $$(curl -s "$(RELEASE_URL)develop/latest" | tr -d '\n') | tail -1)"
+	@echo
+	@echo "About to deploy $(VERSION) to '$(CHANNEL)'. Proceed? [y/N]" && read ans && [ $${ans:-N} == y ]
+
 	aws s3 cp $(RELEASE_DIR) $(BUCKET)/$(CHANNEL)/$(VERSION)/ --recursive \
 		--acl public-read \
 		--cache-control max-age=0
