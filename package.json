@@ -4,7 +4,7 @@
   "author": "Dividat AG <info@dividat.com>",
   "license": "MIT",
   "scripts": {
-    "test": "mocha test/index.js",
+    "test": "mocha --exit test/index.js",
     "replay": "nodemon --watch tools/replay/ tools/replay/"
   },
   "dependencies": {
