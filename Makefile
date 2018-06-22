@@ -28,16 +28,16 @@ CC := gcc
 CXX := g++
 
 # Force static linking on Linux
-PCSCLITE_DIR := $(CWD)libpcsclite
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
-	STATIC_LINKING_LDFLAGS := -linkmode external -extldflags \"-static\"
-	CC := musl-gcc
-	CXX := musl-gcc
+#PCSCLITE_DIR := $(CWD)libpcsclite
+#UNAME_S := $(shell uname -s)
+#ifeq ($(UNAME_S),Linux)
+	#STATIC_LINKING_LDFLAGS := -linkmode external -extldflags \"-static\"
+	#CC := musl-gcc
+	#CXX := musl-gcc
 
-	LIB_PCSCLITE := $(PCSCLITE_DIR)
-	export PKG_CONFIG_PATH=$(PCSCLITE_DIR)/lib/pkgconfig:$$PKG_CONFIG_PATH
-endif
+	#LIB_PCSCLITE := $(PCSCLITE_DIR)
+	#export PKG_CONFIG_PATH=$(PCSCLITE_DIR)/lib/pkgconfig:$$PKG_CONFIG_PATH
+#endif
 
 GO_LDFLAGS = -ldflags "$(STATIC_LINKING_LDFLAGS) -X dividat-driver/server.channel=$(CHANNEL) -X dividat-driver/server.version=$(VERSION) -X dividat-driver/update.releaseUrl=$(RELEASE_URL)"
 

@@ -1,17 +1,11 @@
-with import <nixpkgs> {
-  overlays = [
-    (self: super: {
-      dep = import ./nix/dep.nix super;
-    })
-  ];
-};
-
+with (import ./nix/nixpkgs.nix) {};
 
 stdenv.mkDerivation {
     name = "dividat-driver";
     builder = "${bash}/bin/bash";
     buildInputs =
-      [ go_1_9
+    [ 
+        go_1_9
         dep
         # Git is a de facto dependency of dep
         git
@@ -29,11 +23,5 @@ stdenv.mkDerivation {
       ]
       # PCSC on Darwin
       ++ lib.optional stdenv.isDarwin pkgs.darwin.apple_sdk.frameworks.PCSC
-      ++ lib.optionals stdenv.isLinux
-          [ # glibc replacement for static linking
-            musl
-            # Building pcsclite
-            pkgconfig autoconf automake libtool flex
-          ]
-      ;
+      ++ lib.optional stdenv.isLinux [ pcsclite ];
 }
