@@ -24,11 +24,11 @@ Firefox, Safari and Edge not supported as they are not yet properly implementing
 - Build the driver: `make`
 - Run the driver: `./bin/dividat-driver`
 
-## Tests
+### Tests
 
 Run the test suite with: `make test`.
 
-## Releasing
+### Releasing
 
 Currently releases can only be made for Linux (from Linux). Builds on Linux are statically linked with [musl](https://www.musl-libc.org/).
 
@@ -36,7 +36,15 @@ To create a release run: `make release`. You will need to be able to provide app
 
 To deploy a new release run: `make deploy`. This can only be done if you are on `master` or `develop` branch, have correctly tagged the revision and have AWS credentials set in your environment.
 
-## Cross compilation
+### Go packages
+
+Go dependencies are provided by the [Go machinery](https://nixos.org/nixpkgs/manual/#sec-language-go) in Nix.
+
+For local development you may use `dep` to install go dependencies: `cd src/dividat-driver && dep ensure`.
+
+New Go dependencies can be added with `dep` (e.g. `dep ensure -add github.com/something/supercool`). The specification of dependencies needs to be recreated for Nix. This can be done with the command `make nix/deps.nix`. Check in the updated `Gopkg.toml`, `Gopkg.lock` and `nix/deps.nix` files.
+
+### Cross compilation
 
 A default environment (defined in `default.nix`) provides all necessary dependencies for building on your native system (i.e. Linux or Darwin). Running `make` will create a binary that should run on your system (at least in the default environemnt).
 
