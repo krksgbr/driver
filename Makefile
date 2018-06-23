@@ -15,8 +15,7 @@ GOPATH ?= $(CWD)
 GOROOT := $(shell which go)/../../share/go
 
 # Main source to build
-BIN = dividat-driver
-SRC = ./src/$(BIN)/main.go
+SRC = ./src/dividat-driver/main.go
 
 # Default location where built binary will be placed
 OUT ?= bin/dividat-driver
@@ -48,7 +47,7 @@ build:
 
 ### Test suite ##########################################
 .PHONY: test
-test: $(OUT)
+test: build
 	npm install
 	npm test
 
@@ -57,7 +56,7 @@ test: $(OUT)
 LINUX_BIN = bin/dividat-driver-linux-amd64
 .PHONY: $(LINUX_BIN)
 $(LINUX_BIN):
-	nix-shell nix/crossbuild.nix --command "$(MAKE) OUT=$(LINUX_BIN) STATIC_BUILD=1 GOCROSS_OPTS=\"GOOS=linux GOARCH=amd64\""
+	nix-shell nix/build/linux.nix --command "$(MAKE) OUT=$(LINUX_BIN) STATIC_BUILD=1 GOCROSS_OPTS=\"GOOS=linux GOARCH=amd64\""
 
 crossbuild: $(LINUX_BIN)
 
@@ -82,35 +81,34 @@ $(LATEST):
 	$(call write-signature,$@)
 
 LINUX_RELEASE = $(RELEASE_DIR)/$(notdir $(LINUX_BIN))-$(VERSION)
-#DARWIN_RELEASE = $(RELEASE_DIR)/$(DARWIN)-$(VERSION)
-#WINDOWS_RELEASE = $(RELEASE_DIR)/$(WINDOWS)-$(VERSION).exe
-
-# sign and copy binaries to release folders
-.PHONY: release
-release: $(LINUX_BIN) release/$(CHANNEL)/latest
+$(LINUX_RELEASE): $(LINUX_BIN)
 	mkdir -p $(RELEASE_DIR)
-
-	# Linux
 	cp $(LINUX_BIN) $(LINUX_RELEASE)
 	upx $(LINUX_RELEASE)
 	$(call write-signature,$(LINUX_RELEASE))
 
-# Darwin
-#cp bin/$(DARWIN) $(DARWIN_RELEASE)
-#upx $(DARWIN_RELEASE)
-#$ (call write-signature,$(DARWIN_RELEASE))
+#DARWIN_RELEASE = $(RELEASE_DIR)/$(notdir $(DARWIN_BIN))-$(VERSION)
+#$(DARWIN_RELEASE): $(DARWIN_BIN)
+	#cp bin/$(DARWIN_BIN) $(DARWIN_RELEASE)
+	#upx $(DARWIN_RELEASE)
+	#$ (call write-signature,$(DARWIN_RELEASE))
 
-# Windows
-#cp bin/$(WINDOWS).exe $(WINDOWS_RELEASE)
-#upx $(WINDOWS_RELEASE)
-#\$ (call write-signature,$(WINDOWS_RELEASE))
-#osslsigncode sign \
-	#-pkcs12 $(CODE_SIGNING_CERT) \
-	#-h sha1 \
-	#-n "Dividat Driver" \
-	#-i "https://www.dividat.com/" \
-	#-in $(WINDOWS_RELEASE) \
-	#-out $(WINDOWS_RELEASE)
+#WINDOWS_RELEASE = $(RELEASE_DIR)/$(notdir $(WINDOWS_BIN))-$(VERSION).exe
+#$(WINDOWS_RELEASE): $(WINDOWS_BIN)
+	#cp bin/$(WINDOWS).exe $(WINDOWS_RELEASE)
+	#upx $(WINDOWS_RELEASE)
+	#\$ (call write-signature,$(WINDOWS_RELEASE))
+	#osslsigncode sign \
+		#-pkcs12 $(CODE_SIGNING_CERT) \
+		#-h sha1 \
+		#-n "Dividat Driver" \
+		#-i "https://www.dividat.com/" \
+		#-in $(WINDOWS_RELEASE) \
+		#-out $(WINDOWS_RELEASE)
+
+# sign and copy binaries to release folders
+.PHONY: release
+release: $(LINUX_RELEASE) release/$(CHANNEL)/latest
 
 
 ### Deploy ################################################
@@ -151,4 +149,5 @@ nix/deps.nix:
 clean:
 	rm -rf release/
 	rm -rf bin/
+	rm -rf src/dividat-driver/vendor/
 	go clean
