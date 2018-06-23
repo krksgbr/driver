@@ -4,23 +4,6 @@
 
 Dividat drivers and hardware test suites.
 
-## Prerequisites
-
-For building and testing all dependencies can be installed via [Nix](https://nixos.org/nix).
-
-Alternatively you need:
-
--   [Go](https://golang.org/)
--   [Dep](https://github.com/golang/dep)
--   [NodeJS](https://nodejs.org/)
-
-For packaging:
-
--   [UPX](https://upx.github.io/)
--   osslsigncode (macOS: `brew install osslsigncode`)
--   A recent version of OpenSSL (tested with 1.0.2.m) (macOS: `nix-shell -p openssl`)
--   AWS CLI (macOS: `brew install awscli`)
-
 ## Compatibility
 
 Firefox, Safari and Edge not supported as they are not yet properly implementing _loopback as a trustworthy origin_, see:
@@ -29,24 +12,17 @@ Firefox, Safari and Edge not supported as they are not yet properly implementing
 -   Edge: <https://developer.microsoft.com/en-us/microsoft-edge/platform/issues/11963735/>
 -   Safari: <https://bugs.webkit.org/show_bug.cgi?id=171934>
 
-## Quick start
+## Development
 
--   Clone repository, this will be the $GOPATH
+### Prerequisites
 
--   In your editor settings, set $GOPATH to repo if needed
+[Nix](https://nixos.org/nix) is required for installing dependencies and providing a suitable development environment.
 
--   Install dependencies:
+### Quick start
 
-        make deps
-
--   Build and run
-
-        make
-        ./bin/dividat-driver
-
-    Or use `go run`:
-
-        go run src/cmd/dividat-driver/main.go start
+- Create a suitable environment: `nix-shell`
+- Build the driver: `make`
+- Run the driver: `./bin/dividat-driver`
 
 ## Tests
 
@@ -59,6 +35,12 @@ Currently releases can only be made for Linux (from Linux). Builds on Linux are 
 To create a release run: `make release`. You will need to be able to provide appropriate signing keys.
 
 To deploy a new release run: `make deploy`. This can only be done if you are on `master` or `develop` branch, have correctly tagged the revision and have AWS credentials set in your environment.
+
+## Cross compilation
+
+A default environment (defined in `default.nix`) provides all necessary dependencies for building on your native system (i.e. Linux or Darwin). Running `make` will create a binary that should run on your system (at least in the default environemnt).
+
+Releases are built towards a more clearly specified target system (also statically linked). The target systems are defined in the [`nix/build`](nix/build) folder. Nix provides toolchains and dependencies for the target system in a sub environment. The build system (in the `make crossbuild` target) invokes these sub environments to build releases.
 
 ## Tools
 

@@ -1,5 +1,9 @@
 # Change Log
 
+## [UNRELEASED]
+
+- Improvements to build system, in particular the crossbuild system for building releases.
+
 ## [2.0.0] - 2018-04-09
 
 - Reimplementation of driver in Go with major design overhauls
