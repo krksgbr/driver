@@ -9,7 +9,7 @@ RELEASE_URL = https://dist.dividat.com/releases/driver2/
 ### Basic setup ###########################################
 # Set GOPATH to repository path
 CWD = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
-GOPATH = $(CWD)
+GOPATH ?= $(CWD)
 
 # Set GOROOT to one matching go binary (Travis CI)
 GOROOT := $(shell which go)/../../share/go
@@ -24,14 +24,14 @@ VERSION := $(shell git describe --always HEAD)
 # set the channel name to the branch name
 CHANNEL := $(shell git rev-parse --abbrev-ref HEAD)
 
-CC := gcc
-CXX := g++
+CC ?= gcc
+CXX ?= g++
 
 # Force static linking on Linux
 #PCSCLITE_DIR := $(CWD)libpcsclite
 #UNAME_S := $(shell uname -s)
 #ifeq ($(UNAME_S),Linux)
-	#STATIC_LINKING_LDFLAGS := -linkmode external -extldflags \"-static\"
+#STATIC_LINKING_LDFLAGS := -linkmode external -extldflags \"-static\"
 	#CC := musl-gcc
 	#CXX := musl-gcc
 
@@ -46,8 +46,8 @@ CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 
 ### Simple build ##########################################
 .PHONY: $(BIN)
-$(BIN): deps
-	GOROOT=$(GOROOT) GOPATH=$(GOPATH) CC=$(CC) CXX=$(CXX) go build $(GO_LDFLAGS) -o bin/$(BIN) $(SRC)
+$(BIN):
+	GOROOT=$(GOROOT) CC=$(CC) CXX=$(CXX) go build $(GO_LDFLAGS) -o bin/$(BIN) $(SRC)
 
 
 ### Test suite ##########################################
@@ -164,6 +164,10 @@ deploy: release
 
 
 ### Dependencies and cleanup ##############################
+.PHONY: nix/deps.nix
+nix/deps.nix:
+	dep2nix -i src/dividat-driver/Gopkg.lock -o nix/deps.nix
+
 deps: $(LIB_PCSCLITE)
 	cd src/$(BIN) && dep ensure
 
