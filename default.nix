@@ -1,22 +1,24 @@
-with import <nixpkgs> {
-  overlays = [
-    (self: super: {
-      dep = import ./nix/dep.nix super;
-    })
-  ];
-};
+with (import ./nix/nixpkgs.nix) {};
 
-
-stdenv.mkDerivation {
+buildGoPackage rec {
     name = "dividat-driver";
-    builder = "${bash}/bin/bash";
+    goPackagePath = "dividat-driver";
+
+    src = ./src/dividat-driver;
+
+    goDeps = ./nix/deps.nix;
+
     buildInputs =
-      [ go_1_9
+    [ 
+        go_1_9
         dep
         # Git is a de facto dependency of dep
         git
 
         gcc
+
+        nix-prefetch-git
+        (import ./nix/deps2nix {inherit stdenv fetchFromGitHub buildGoPackage;})
 
         # node for tests
         nodejs-8_x
@@ -26,14 +28,13 @@ stdenv.mkDerivation {
         # for deployment to S3
         awscli
 
+        autoconf automake libtool flex
+
+        pkgconfig
+
       ]
       # PCSC on Darwin
       ++ lib.optional stdenv.isDarwin pkgs.darwin.apple_sdk.frameworks.PCSC
-      ++ lib.optionals stdenv.isLinux
-          [ # glibc replacement for static linking
-            musl
-            # Building pcsclite
-            pkgconfig autoconf automake libtool flex
-          ]
-      ;
+      ++ lib.optional stdenv.isLinux [ pcsclite ];
+
 }

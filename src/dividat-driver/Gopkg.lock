@@ -42,7 +42,11 @@
 [[projects]]
   branch = "master"
   name = "github.com/inconshreveable/go-update"
-  packages = [".","internal/binarydist","internal/osext"]
+  packages = [
+    ".",
+    "internal/binarydist",
+    "internal/osext"
+  ]
   revision = "8152e7eb6ccf8679a64582a66b78519688d156ad"
 
 [[projects]]
@@ -58,7 +62,10 @@
 
 [[projects]]
   name = "github.com/miekg/dns"
-  packages = [".","internal/socket"]
+  packages = [
+    ".",
+    "internal/socket"
+  ]
   revision = "a5852667e3c36e2e0b0a69ab43869e00e95aacdf"
 
 [[projects]]
@@ -79,17 +86,31 @@
 
 [[projects]]
   name = "golang.org/x/net"
-  packages = ["bpf","context","internal/iana","internal/socket","ipv4","ipv6"]
+  packages = [
+    "bpf",
+    "context",
+    "internal/iana",
+    "internal/socket",
+    "ipv4",
+    "ipv6"
+  ]
   revision = "c73622c77280266305273cb545f54516ced95b93"
 
 [[projects]]
   name = "golang.org/x/sys"
-  packages = ["unix","windows","windows/registry","windows/svc","windows/svc/eventlog","windows/svc/mgr"]
+  packages = [
+    "unix",
+    "windows",
+    "windows/registry",
+    "windows/svc",
+    "windows/svc/eventlog",
+    "windows/svc/mgr"
+  ]
   revision = "314a259e304ff91bd6985da2a7149bbf91237993"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f1c61b7e24fbd789c4cad8cff16d1fbafc6d16095d36784ecc8d34dbcb9883f7"
+  inputs-digest = "b47a069bc5fcb7ee697fca8d8dd8be071910d5cb23e62f17cd28385888a1992f"
   solver-name = "gps-cdcl"
   solver-version = 1

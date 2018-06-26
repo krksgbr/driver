@@ -9,14 +9,16 @@ RELEASE_URL = https://dist.dividat.com/releases/driver2/
 ### Basic setup ###########################################
 # Set GOPATH to repository path
 CWD = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
-GOPATH = $(CWD)
+GOPATH ?= $(CWD)
 
 # Set GOROOT to one matching go binary (Travis CI)
 GOROOT := $(shell which go)/../../share/go
 
 # Main source to build
-BIN = dividat-driver
-SRC = ./src/$(BIN)/main.go
+SRC = ./src/dividat-driver/main.go
+
+# Default location where built binary will be placed
+OUT ?= bin/dividat-driver
 
 # Get version from git
 VERSION := $(shell git describe --always HEAD)
@@ -24,19 +26,12 @@ VERSION := $(shell git describe --always HEAD)
 # set the channel name to the branch name
 CHANNEL := $(shell git rev-parse --abbrev-ref HEAD)
 
-CC := gcc
-CXX := g++
+CC ?= gcc
+CXX ?= g++
 
-# Force static linking on Linux
-PCSCLITE_DIR := $(CWD)libpcsclite
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
+# Enable static linking
+ifdef STATIC_BUILD
 	STATIC_LINKING_LDFLAGS := -linkmode external -extldflags \"-static\"
-	CC := musl-gcc
-	CXX := musl-gcc
-
-	LIB_PCSCLITE := $(PCSCLITE_DIR)
-	export PKG_CONFIG_PATH=$(PCSCLITE_DIR)/lib/pkgconfig:$$PKG_CONFIG_PATH
 endif
 
 GO_LDFLAGS = -ldflags "$(STATIC_LINKING_LDFLAGS) -X dividat-driver/server.channel=$(CHANNEL) -X dividat-driver/server.version=$(VERSION) -X dividat-driver/update.releaseUrl=$(RELEASE_URL)"
@@ -45,41 +40,25 @@ CODE_SIGNING_CERT ?= ./keys/codesign.p12
 CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 
 ### Simple build ##########################################
-.PHONY: $(BIN)
-$(BIN): deps
-	GOROOT=$(GOROOT) GOPATH=$(GOPATH) CC=$(CC) CXX=$(CXX) go build $(GO_LDFLAGS) -o bin/$(BIN) $(SRC)
+.PHONY: build
+build: nix/deps.nix
+	GOROOT=$(GOROOT) $(GOCROSS_OPTS) CC=$(CC) CXX=$(CXX) go build $(GO_LDFLAGS) -o $(OUT) $(SRC)
 
 
 ### Test suite ##########################################
 .PHONY: test
-test: $(BIN)
+test: build
 	npm install
 	npm test
 
 
 ### Cross compilation #####################################
+LINUX_BIN = bin/dividat-driver-linux-amd64
+.PHONY: $(LINUX_BIN)
+$(LINUX_BIN):
+	nix-shell nix/build/linux.nix --command "$(MAKE) OUT=$(LINUX_BIN) STATIC_BUILD=1 GOCROSS_OPTS=\"GOOS=linux GOARCH=amd64\""
 
-# helper for cross compilation
-define cross-build
-	GOOS=$(1) GOARCH=amd64 GOROOT=$(GOROOT) GOPATH=$(GOPATH) CC=$(CC) CXX=$(CXX) go build $(GO_LDFLAGS) -o $(2) $(SRC)
-endef
-
-LINUX = $(BIN)-linux-amd64
-.PHONY: $(LINUX)
-$(LINUX):
-	$(call cross-build,linux,bin/$(LINUX))
-
-DARWIN = $(BIN)-darwin-amd64
-.PHONY: $(DARWIN)
-$(DARWIN):
-	$(call cross-build,darwin,bin/$(DARWIN))
-
-WINDOWS = $(BIN)-windows-amd64
-.PHONY: $(WINDOWS)
-$(WINDOWS):
-	$(call cross-build,windows,bin/$(WINDOWS).exe)
-
-crossbuild: deps $(LINUX) # $(DARWIN) $(WINDOWS)
+crossbuild: $(LINUX_BIN)
 
 
 ### Release ###############################################
@@ -101,26 +80,21 @@ $(LATEST):
 	echo $(VERSION) > $@
 	$(call write-signature,$@)
 
-LINUX_RELEASE = $(RELEASE_DIR)/$(LINUX)-$(VERSION)
-DARWIN_RELEASE = $(RELEASE_DIR)/$(DARWIN)-$(VERSION)
-WINDOWS_RELEASE = $(RELEASE_DIR)/$(WINDOWS)-$(VERSION).exe
-
-# sign and copy binaries to release folders
-.PHONY: release
-release: crossbuild release/$(CHANNEL)/latest
+LINUX_RELEASE = $(RELEASE_DIR)/$(notdir $(LINUX_BIN))-$(VERSION)
+$(LINUX_RELEASE): $(LINUX_BIN)
 	mkdir -p $(RELEASE_DIR)
-
-	# Linux
-	cp bin/$(LINUX) $(LINUX_RELEASE)
+	cp $(LINUX_BIN) $(LINUX_RELEASE)
 	upx $(LINUX_RELEASE)
 	$(call write-signature,$(LINUX_RELEASE))
 
-	# Darwin
-	#cp bin/$(DARWIN) $(DARWIN_RELEASE)
+#DARWIN_RELEASE = $(RELEASE_DIR)/$(notdir $(DARWIN_BIN))-$(VERSION)
+#$(DARWIN_RELEASE): $(DARWIN_BIN)
+	#cp bin/$(DARWIN_BIN) $(DARWIN_RELEASE)
 	#upx $(DARWIN_RELEASE)
 	#$ (call write-signature,$(DARWIN_RELEASE))
 
-	# Windows
+#WINDOWS_RELEASE = $(RELEASE_DIR)/$(notdir $(WINDOWS_BIN))-$(VERSION).exe
+#$(WINDOWS_RELEASE): $(WINDOWS_BIN)
 	#cp bin/$(WINDOWS).exe $(WINDOWS_RELEASE)
 	#upx $(WINDOWS_RELEASE)
 	#\$ (call write-signature,$(WINDOWS_RELEASE))
@@ -131,6 +105,10 @@ release: crossbuild release/$(CHANNEL)/latest
 		#-i "https://www.dividat.com/" \
 		#-in $(WINDOWS_RELEASE) \
 		#-out $(WINDOWS_RELEASE)
+
+# sign and copy binaries to release folders
+.PHONY: release
+release: $(LINUX_RELEASE) release/$(CHANNEL)/latest
 
 
 ### Deploy ################################################
@@ -164,29 +142,11 @@ deploy: release
 
 
 ### Dependencies and cleanup ##############################
-deps: $(LIB_PCSCLITE)
-	cd src/$(BIN) && dep ensure
-
-$(PCSCLITE_DIR):
-	curl -LO https://github.com/LudovicRousseau/PCSC/archive/pcsc-1.8.23.tar.gz
-	mkdir -p tmp/pcsclite && tar xzf pcsc-1.8.23.tar.gz -C tmp/pcsclite --strip-components=1
-	cd tmp/pcsclite; \
-		./bootstrap; \
-		CC=musl-gcc ./configure \
-			--enable-static \
-			--prefix=$(PCSCLITE_DIR) \
-			--with-systemdsystemunitdir=$(PCSCLITE_DIR)/lib/systemd/system \
-			--disable-libudev \
-			--disable-libusb \
-			--disable-libsystemd; \
-		make; \
-		make install
-	rm -rf tmp/pcsclite
-	rm pcsc-1.8.23.tar.gz
-
+nix/deps.nix: src/dividat-driver/Gopkg.toml
+	dep2nix -i src/dividat-driver/Gopkg.lock -o nix/deps.nix
 
 clean:
 	rm -rf release/
-	rm -rf $(PCSCLITE_DIR)
-	rm -f $(CHECK_VERSION_BIN)
+	rm -rf bin/
+	rm -rf src/dividat-driver/vendor/
 	go clean
