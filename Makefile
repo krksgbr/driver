@@ -142,8 +142,7 @@ deploy: release
 
 
 ### Dependencies and cleanup ##############################
-.PHONY: nix/deps.nix
-nix/deps.nix:
+nix/deps.nix: src/dividat-driver/Gopkg.toml
 	dep2nix -i src/dividat-driver/Gopkg.lock -o nix/deps.nix
 
 clean:
