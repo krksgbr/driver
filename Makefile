@@ -41,7 +41,7 @@ CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 
 ### Simple build ##########################################
 .PHONY: build
-build:
+build: nix/deps.nix
 	GOROOT=$(GOROOT) $(GOCROSS_OPTS) CC=$(CC) CXX=$(CXX) go build $(GO_LDFLAGS) -o $(OUT) $(SRC)
 
 

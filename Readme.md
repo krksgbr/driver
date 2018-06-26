@@ -34,7 +34,7 @@ Go dependencies are provided by the [Go machinery](https://nixos.org/nixpkgs/man
 
 For local development you may use `dep` to install go dependencies: `cd src/dividat-driver && dep ensure`.
 
-New Go dependencies can be added with `dep` (e.g. `dep ensure -add github.com/something/supercool`). The specification of dependencies needs to be recreated for Nix. This can be done with the command `make nix/deps.nix`. Check in the updated `Gopkg.toml`, `Gopkg.lock` and `nix/deps.nix` files.
+New Go dependencies can be added with `dep` (e.g. `dep ensure -add github.com/something/supercool`). The Nix specification of dependencies will recreated on subsequent builds (i.e. running `make`). Check in the updated `Gopkg.toml`, `Gopkg.lock` and `nix/deps.nix` files.
 
 ### Releasing
 
