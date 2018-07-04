@@ -216,8 +216,8 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 				continue
 			}
 			uid := ""
-			for i := 0; i < len(response)-2; i++ {
-				uid += fmt.Sprintf("%X", response[i])
+			if len(response) > 2 {
+				uid = fmt.Sprintf("%X", response[0:len(response)-2])
 			}
 			profile := knownReaders[readerState.Reader]
 			if len(uid) > 0 && (profile.lastKnownToken == nil || *profile.lastKnownToken != uid) {
