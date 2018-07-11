@@ -39,8 +39,8 @@ var CARD_POLLING_TIMEOUT = 1 * time.Second
 const MAGIC_PNP_NAME = "\\\\?PnP?\\Notification"
 
 // APDU to retrieve a card's UID
-var UID_APDU = []byte{0xFF, 0xCA, 0x00, 0x00, 0x00}
-var NO_BUZZ_APDU = []byte{0xFF, 0x00, 0x52, 0x00, 0x00}
+var uidAPDU = []byte{0xFF, 0xCA, 0x00, 0x00, 0x00}
+var noBuzzAPDU = []byte{0xFF, 0x00, 0x52, 0x00, 0x00}
 
 func pollSmartCard(ctx context.Context, log *logrus.Entry, onToken func(string), onReadersChange func([]string)) {
 
@@ -205,13 +205,13 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 			// drivers don't allow transmission of commands without a card present, so
 			// this will silence all but the first buzz during the connection's
 			// lifetime.
-			_, err = card.Transmit(NO_BUZZ_APDU)
+			_, err = card.Transmit(noBuzzAPDU)
 			if err != nil {
 				log.WithError(err).Debug("Failed while transmitting silencer APDU.")
 			}
 
 			// Request UID
-			response, err := card.Transmit(UID_APDU)
+			response, err := card.Transmit(uidAPDU)
 			if err != nil {
 				log.WithError(err).Debug("Failed while transmitting UID APDU.")
 				continue
