@@ -22,6 +22,7 @@ Classic tags.
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -215,12 +216,11 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 				log.WithError(err).Debug("Failed while transmitting UID APDU.")
 				continue
 			}
-			uid := ""
-			if len(response) > 2 {
-				uid = fmt.Sprintf("%X", response[0:len(response)-2])
-			}
+
 			profile := knownReaders[readerState.Reader]
-			if len(uid) > 0 && (profile.lastKnownToken == nil || *profile.lastKnownToken != uid) {
+
+			uid, err := parseUID(response)
+			if err != nil && (profile.lastKnownToken == nil || *profile.lastKnownToken != uid) {
 				log.Info("Detected RFID token.")
 				knownReaders[readerState.Reader] = profile.withToken(&uid)
 				onToken(uid)
@@ -249,6 +249,18 @@ func (profile ReaderProfile) withToken(token *string) ReaderProfile {
 }
 
 // Helpers
+
+const iso78164StatusBytes = 2
+
+func parseUID(arr []byte) (uid string, err error) {
+	size := len(arr)
+	if size > iso78164StatusBytes && arr[size-2] == 0x90 && arr[size-1] == 0x00 {
+		uid = fmt.Sprintf("%X", arr[0:size-iso78164StatusBytes])
+	} else {
+		err = errors.New("Invalid response for card UID request.")
+	}
+	return
+}
 
 func is(mask scard.StateFlag, flag scard.StateFlag) bool {
 	return mask&flag != 0
