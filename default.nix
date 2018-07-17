@@ -19,12 +19,14 @@ buildGoPackage rec {
 
         nix-prefetch-git
         (import ./nix/deps2nix {inherit stdenv fetchFromGitHub buildGoPackage;})
-
         # node for tests
         nodejs-8_x
 
         # for building releases
         openssl upx
+
+        # for signing windows releases
+        (import ./nix/osslsigncode {inherit stdenv fetchurl openssl curl autoconf;})
         # for deployment to S3
         awscli
 
