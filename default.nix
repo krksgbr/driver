@@ -30,10 +30,8 @@ buildGoPackage rec {
         # for deployment to S3
         awscli
 
-        autoconf automake libtool flex
-
-        pkgconfig
-
+        # Required for building go dependencies
+        autoconf automake libtool flex pkgconfig
       ]
       # PCSC on Darwin
       ++ lib.optional stdenv.isDarwin pkgs.darwin.apple_sdk.frameworks.PCSC
