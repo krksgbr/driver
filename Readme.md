@@ -57,6 +57,20 @@ Existing release targets:
 
 To deploy a new release run: `make deploy`. This can only be done if you are on `master` or `develop` branch, have correctly tagged the revision and have AWS credentials set in your environment.
 
+## Installation
+
+### Windows
+
+This application can run as a Windows service:
+
+```
+PS C:\> New-Service -Name "DividatDriver" -BinaryPathName "C:\dividat-driver-windows-amd64-2.1.0.exe" -DisplayName "Dividat Driver" -StartupType Automatic
+
+PS C:\ Start-Service DividatDriver
+```
+
+See <https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service> for more information on setting up a Windows service.
+
 ## Tools
 
 ### Data replayer
