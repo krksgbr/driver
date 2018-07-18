@@ -187,7 +187,6 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 			_, err = card.Transmit(NO_BUZZ_APDU)
 			if err != nil {
 				log.WithError(err).Debug("Failed while transmitting silencer APDU.")
-				continue
 			}
 
 			// Request UID
