@@ -61,15 +61,15 @@ To deploy a new release run: `make deploy`. This can only be done if you are on 
 
 ### Windows
 
-This application can run as a Windows service:
+This application can be run as a Windows service (<https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service>).
+
+A PowerShell script is provided to download and install the latest version as a Windows service. To run the script enter following command in an administrative PowerShell:
 
 ```
-PS C:\> New-Service -Name "DividatDriver" -BinaryPathName "C:\dividat-driver-windows-amd64-2.1.0.exe" -DisplayName "Dividat Driver" -StartupType Automatic
-
-PS C:\ Start-Service DividatDriver
+PS C:\ Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/dividat/driver/master/install.ps1'))
 ```
 
-See <https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service> for more information on setting up a Windows service.
+Please have a look at the [script](install.ps1) before running it on your system.
 
 ## Tools
 
