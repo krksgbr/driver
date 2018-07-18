@@ -1,5 +1,25 @@
 package rfid
 
+/* Implements communication with ISO7816-4 compliant RFID readers via PC/SC.
+
+The basic assumption of this implementation is
+
+- we do not know the exact reader hardware connected in an installation, and
+- there are no readers connected to host machines other than those of interest
+  to our application.
+
+For this reason, the implementation simply queries all readers it finds for card
+UIDs continuously. Whenever a newly connected card responds to the request for
+its UID, the UID is passed on.
+
+Connection to the PC/SC service occurs through scard, a Go wrapper that
+harmonizes the PC/SC implementations of the various OS.
+
+This implementation has been tested with ACS ACR122U readers and Mifare 1K
+Classic tags.
+
+*/
+
 import (
 	"context"
 	"fmt"

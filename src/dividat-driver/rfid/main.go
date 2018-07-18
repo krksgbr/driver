@@ -1,5 +1,36 @@
 package rfid
 
+/* Service for RFID tag touch-on events and listing connected readers.
+
+The purpose of this service is to notify subscribers of any RFID tags read by
+readers available to the host machine. The only information extracted from tags
+is their UID.
+
+In order to subscribe to RFID events, a client can open a WebSocket
+connection to
+
+    /rfid
+
+and will receive messages in case a new tag is read or the list of available
+readers changes.
+
+In addition, the current list is retrievable through simple GET request to
+
+    /rfid/readers
+
+The intended range of supported readers and tags includes all systems
+communicating according to ISO 7816-4, granted that the readers offer PC/SC
+support.
+
+The range of supported operating systems includes Windows and macOS, which come
+with bundled PC/SC services, as well as Linux systems running the libpcsclite
+service (pcscd).
+
+For details on the implementation and strategy of working with readers, see
+`pcsc.go`. The detection loop is only active if there are subscribers.
+
+*/
+
 import (
 	"context"
 	"encoding/json"
