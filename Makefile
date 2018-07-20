@@ -106,6 +106,7 @@ $(WINDOWS_RELEASE): $(WINDOWS_BIN)
 		-h sha1 \
 		-n "Dividat Driver" \
 		-i "https://www.dividat.com/" \
+		-t http://timestamp.verisign.com/scripts/timstamp.dll \
 		-in $(WINDOWS_BIN) \
 		-out $(WINDOWS_RELEASE)
 	$(call write-signature,$(WINDOWS_RELEASE))
