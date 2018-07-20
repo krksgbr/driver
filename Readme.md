@@ -40,7 +40,7 @@ New Go dependencies can be added with `dep` (e.g. `dep ensure -add github.com/so
 
 #### Building
 
-**Currently releases can only be made for Linux (from Linux).**
+**Currently releases can only be made from Linux.**
 
 To create a release run: `make release`.
 
@@ -51,10 +51,25 @@ Releases are built towards a more clearly specified target system (also statical
 Existing release targets:
 
 - Linux: statically linked with [musl](https://www.musl-libc.org/)
+- Windows
 
 ### Deploying
 
 To deploy a new release run: `make deploy`. This can only be done if you are on `master` or `develop` branch, have correctly tagged the revision and have AWS credentials set in your environment.
+
+## Installation
+
+### Windows
+
+This application can be run as a Windows service (<https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service>).
+
+A PowerShell script is provided to download and install the latest version as a Windows service. To run the script enter following command in an administrative PowerShell:
+
+```
+PS C:\ Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/dividat/driver/master/install.ps1'))
+```
+
+Please have a look at the [script](install.ps1) before running it on your system.
 
 ## Tools
 
