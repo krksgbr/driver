@@ -5,6 +5,7 @@
 ### Changed
 
 - Improvements to build system, in particular the crossbuild system for building releases.
+- Add support for listing SmartCard readers and subscribing to card UIDs
 
 ### Added
 
