@@ -107,6 +107,7 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 				knownReaders[name] = ReaderProfile{
 					lastKnownState: scard.StateUnknown,
 					lastKnownToken: nil,
+					consecutiveFails: 0,
 				}
 				log.Info(fmt.Sprintf("Reader became available: '%s'", name))
 				hasListChanged = true
@@ -194,11 +195,12 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 			card, err := scard_ctx.Connect(readerState.Reader, scard.ShareShared, scard.ProtocolAny)
 			if err != nil {
 				log.WithError(err).Debug("Error connecting to card.")
-				knownReaders[readerState.Reader] = ReaderProfile{
-					lastKnownState: scard.StateUnknown,
-					lastKnownToken: nil,
-				}
+				knownReaders[readerState.Reader] =
+					knownReaders[readerState.Reader].withFailure()
 				continue
+			} else {
+				knownReaders[readerState.Reader] =
+					knownReaders[readerState.Reader].withSuccess()
 			}
 
 			// Turn off buzzer for the lifetime of the connection to the reader. Most
@@ -238,14 +240,27 @@ type ReaderProfile struct {
 	// a single touch-on. We store detected card IDs to deduplicate token stream
 	// for subscribers.
 	lastKnownToken *string
+	consecutiveFails int
 }
 
 func (profile ReaderProfile) withState(flag scard.StateFlag) ReaderProfile {
-	return ReaderProfile{lastKnownState: flag, lastKnownToken: profile.lastKnownToken}
+	return ReaderProfile{lastKnownState: flag, lastKnownToken: profile.lastKnownToken, consecutiveFails: profile.consecutiveFails}
 }
 
 func (profile ReaderProfile) withToken(token *string) ReaderProfile {
-	return ReaderProfile{lastKnownState: profile.lastKnownState, lastKnownToken: token}
+	return ReaderProfile{lastKnownState: profile.lastKnownState, lastKnownToken: token, consecutiveFails: profile.consecutiveFails}
+}
+
+func (profile ReaderProfile) withFailure() ReaderProfile {
+	if profile.consecutiveFails < 10 {
+		return ReaderProfile{lastKnownState: scard.StateUnknown, lastKnownToken: nil, consecutiveFails: profile.consecutiveFails + 1}
+	} else {
+		return ReaderProfile{lastKnownState: profile.lastKnownState, lastKnownToken: profile.lastKnownToken, consecutiveFails: profile.consecutiveFails}
+	}
+}
+
+func (profile ReaderProfile) withSuccess() ReaderProfile {
+	return ReaderProfile{lastKnownState: profile.lastKnownState, lastKnownToken: profile.lastKnownToken, consecutiveFails: 0}
 }
 
 // Helpers
