@@ -220,7 +220,7 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 			profile := knownReaders[readerState.Reader]
 
 			uid, err := parseUID(response)
-			if err != nil && (profile.lastKnownToken == nil || *profile.lastKnownToken != uid) {
+			if err == nil && (profile.lastKnownToken == nil || *profile.lastKnownToken != uid) {
 				log.Info("Detected RFID token.")
 				knownReaders[readerState.Reader] = profile.withToken(&uid)
 				onToken(uid)
