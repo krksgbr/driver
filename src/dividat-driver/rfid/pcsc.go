@@ -226,6 +226,8 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 				log.Info("Detected RFID token.")
 				knownReaders[readerState.Reader] = profile.withToken(&uid)
 				onToken(uid)
+			} else if err != nil {
+				log.WithError(err).Error("Error parsing RFID token.")
 			}
 
 			card.Disconnect(scard.UnpowerCard)
