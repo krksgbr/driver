@@ -193,7 +193,7 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 			// Connect to the card
 			card, err := scard_ctx.Connect(readerState.Reader, scard.ShareShared, scard.ProtocolAny)
 			if err != nil {
-				log.WithError(err).Error("Error connecting to card.")
+				log.WithError(err).Debug("Error connecting to card.")
 				knownReaders[readerState.Reader] = ReaderProfile{
 					lastKnownState: scard.StateUnknown,
 					lastKnownToken: nil,
