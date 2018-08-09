@@ -11,9 +11,6 @@ RELEASE_URL = https://dist.dividat.com/releases/driver2/
 CWD = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 GOPATH ?= $(CWD)
 
-# Set GOROOT to one matching go binary (Travis CI)
-GOROOT := $(shell which go)/../../share/go
-
 # Main source to build
 SRC = ./src/dividat-driver/main.go
 
@@ -42,7 +39,7 @@ CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 ### Simple build ##########################################
 .PHONY: build
 build: nix/deps.nix
-	GOROOT=$(GOROOT) $(GOCROSS_OPTS) CC=$(CC) CXX=$(CXX) go build $(GO_LDFLAGS) -o $(OUT) $(SRC)
+	$(GOCROSS_OPTS) CC=$(CC) CXX=$(CXX) go build $(GO_LDFLAGS) -o $(OUT) $(SRC)
 
 
 ### Test suite ##########################################
