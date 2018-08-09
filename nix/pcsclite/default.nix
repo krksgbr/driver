@@ -42,11 +42,7 @@ stdenv.mkDerivation rec {
     }' config.h
   '';
 
-  depsBuildBuild = [
-    autoconf automake libtool flex python perl
-  ];
-
-  nativeBuildInputs = [ pkgconfig ];
+  nativeBuildInputs = [ autoconf automake libtool flex pkgconfig perl python ];
 
   meta = with stdenv.lib; {
     description = "Middleware to access a smart card using SCard API (PC/SC)";
