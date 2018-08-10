@@ -48,7 +48,10 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, onToken func(string),
 	scardContextBackoff.MaxElapsedTime = 0
 	scardContextBackoff.MaxInterval = 2 * time.Minute
 
+	// Flag to signal termination from above
 	haveBeenKilled := false
+	// Channel for reader loop to signal loss of context
+	lostContext := make(chan bool)
 
 	for {
 		// Establish a PC/SC context
@@ -76,19 +79,24 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, onToken func(string),
 
 		log.WithField("pnp", hasPnP).Info("Starting RFID scanner.")
 
-		go waitForCardActivity(&haveBeenKilled, log, scard_ctx, hasPnP, onToken, onReadersChange)
+		go waitForCardActivity(&haveBeenKilled, lostContext, log, scard_ctx, hasPnP, onToken, onReadersChange)
 
-		<-ctx.Done()
-		// Cancel `GetStatusChange`
-		scard_ctx.Cancel()
-		haveBeenKilled = true
 
-		log.Info("Stopping RFID scanner.")
-		return
+		select {
+		case <-lostContext:
+			continue
+		case <-ctx.Done():
+			// Cancel `GetStatusChange`
+			scard_ctx.Cancel()
+			haveBeenKilled = true
+
+			log.Info("Stopping RFID scanner.")
+			return
+		}
 	}
 }
 
-func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *scard.Context, hasPnP bool, onToken func(string), onReadersChange func([]string)) {
+func waitForCardActivity(haveBeenKilled *bool, lostContext chan bool, log *logrus.Entry, scard_ctx *scard.Context, hasPnP bool, onToken func(string), onReadersChange func([]string)) {
 	knownReaders := map[string]ReaderProfile{}
 
 	updateKnownReaders := func(log *logrus.Entry, onReadersChange func([]string), current []string) {
@@ -128,6 +136,12 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 		newReaders, err := scard_ctx.ListReaders()
 		if err != nil && err != scard.ErrNoReadersAvailable {
 			log.WithError(err).Debug("Error listing readers.")
+
+			if err == scard.ErrServiceStopped {
+				// Signal loss of context and terminate
+				lostContext <- true
+				return
+			}
 		}
 		updateKnownReaders(log, onReadersChange, newReaders)
 
