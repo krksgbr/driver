@@ -22,6 +22,7 @@ Classic tags.
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -38,8 +39,8 @@ var CARD_POLLING_TIMEOUT = 1 * time.Second
 const MAGIC_PNP_NAME = "\\\\?PnP?\\Notification"
 
 // APDU to retrieve a card's UID
-var UID_APDU = []byte{0xFF, 0xCA, 0x00, 0x00, 0x00}
-var NO_BUZZ_APDU = []byte{0xFF, 0x00, 0x52, 0x00, 0x00}
+var uidAPDU = []byte{0xFF, 0xCA, 0x00, 0x00, 0x00}
+var noBuzzAPDU = []byte{0xFF, 0x00, 0x52, 0x00, 0x00}
 
 func pollSmartCard(ctx context.Context, log *logrus.Entry, onToken func(string), onReadersChange func([]string)) {
 
@@ -106,6 +107,7 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 				knownReaders[name] = ReaderProfile{
 					lastKnownState: scard.StateUnknown,
 					lastKnownToken: nil,
+					consecutiveFails: 0,
 				}
 				log.Info(fmt.Sprintf("Reader became available: '%s'", name))
 				hasListChanged = true
@@ -124,8 +126,7 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 
 		// Retrieve available readers
 		newReaders, err := scard_ctx.ListReaders()
-		if err != nil {
-			// TODO With pcsclite this fails if there are no smart card readers. Too noisy.
+		if err != nil && err != scard.ErrNoReadersAvailable {
 			log.WithError(err).Debug("Error listing readers.")
 		}
 		updateKnownReaders(log, onReadersChange, newReaders)
@@ -192,38 +193,40 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 			// Connect to the card
 			card, err := scard_ctx.Connect(readerState.Reader, scard.ShareShared, scard.ProtocolAny)
 			if err != nil {
-				log.WithError(err).Error("Error connecting to card.")
-				knownReaders[readerState.Reader] = ReaderProfile{
-					lastKnownState: scard.StateUnknown,
-					lastKnownToken: nil,
-				}
+				log.WithError(err).Debug("Error connecting to card.")
+				knownReaders[readerState.Reader] =
+					knownReaders[readerState.Reader].withFailure()
 				continue
+			} else {
+				knownReaders[readerState.Reader] =
+					knownReaders[readerState.Reader].withSuccess()
 			}
 
 			// Turn off buzzer for the lifetime of the connection to the reader. Most
 			// drivers don't allow transmission of commands without a card present, so
 			// this will silence all but the first buzz during the connection's
 			// lifetime.
-			_, err = card.Transmit(NO_BUZZ_APDU)
+			_, err = card.Transmit(noBuzzAPDU)
 			if err != nil {
 				log.WithError(err).Debug("Failed while transmitting silencer APDU.")
 			}
 
 			// Request UID
-			response, err := card.Transmit(UID_APDU)
+			response, err := card.Transmit(uidAPDU)
 			if err != nil {
 				log.WithError(err).Debug("Failed while transmitting UID APDU.")
 				continue
 			}
-			uid := ""
-			for i := 0; i < len(response)-2; i++ {
-				uid += fmt.Sprintf("%X", response[i])
-			}
+
 			profile := knownReaders[readerState.Reader]
-			if len(uid) > 0 && (profile.lastKnownToken == nil || *profile.lastKnownToken != uid) {
+
+			uid, err := parseUID(response)
+			if err == nil && (profile.lastKnownToken == nil || *profile.lastKnownToken != uid) {
 				log.Info("Detected RFID token.")
 				knownReaders[readerState.Reader] = profile.withToken(&uid)
 				onToken(uid)
+			} else if err != nil {
+				log.WithError(err).Error("Error parsing RFID token.")
 			}
 
 			card.Disconnect(scard.UnpowerCard)
@@ -238,17 +241,42 @@ type ReaderProfile struct {
 	// a single touch-on. We store detected card IDs to deduplicate token stream
 	// for subscribers.
 	lastKnownToken *string
+	consecutiveFails int
 }
 
 func (profile ReaderProfile) withState(flag scard.StateFlag) ReaderProfile {
-	return ReaderProfile{lastKnownState: flag, lastKnownToken: profile.lastKnownToken}
+	return ReaderProfile{lastKnownState: flag, lastKnownToken: profile.lastKnownToken, consecutiveFails: profile.consecutiveFails}
 }
 
 func (profile ReaderProfile) withToken(token *string) ReaderProfile {
-	return ReaderProfile{lastKnownState: profile.lastKnownState, lastKnownToken: token}
+	return ReaderProfile{lastKnownState: profile.lastKnownState, lastKnownToken: token, consecutiveFails: profile.consecutiveFails}
+}
+
+func (profile ReaderProfile) withFailure() ReaderProfile {
+	if profile.consecutiveFails < 10 {
+		return ReaderProfile{lastKnownState: scard.StateUnknown, lastKnownToken: nil, consecutiveFails: profile.consecutiveFails + 1}
+	} else {
+		return ReaderProfile{lastKnownState: profile.lastKnownState, lastKnownToken: profile.lastKnownToken, consecutiveFails: profile.consecutiveFails}
+	}
+}
+
+func (profile ReaderProfile) withSuccess() ReaderProfile {
+	return ReaderProfile{lastKnownState: profile.lastKnownState, lastKnownToken: profile.lastKnownToken, consecutiveFails: 0}
 }
 
 // Helpers
+
+const iso78164StatusBytes = 2
+
+func parseUID(arr []byte) (uid string, err error) {
+	size := len(arr)
+	if size > iso78164StatusBytes && arr[size-2] == 0x90 && arr[size-1] == 0x00 {
+		uid = fmt.Sprintf("%X", arr[0:size-iso78164StatusBytes])
+	} else {
+		err = errors.New("Invalid response for card UID request.")
+	}
+	return
+}
 
 func is(mask scard.StateFlag, flag scard.StateFlag) bool {
 	return mask&flag != 0
