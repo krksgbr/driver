@@ -126,8 +126,7 @@ func waitForCardActivity(haveBeenKilled *bool, log *logrus.Entry, scard_ctx *sca
 
 		// Retrieve available readers
 		newReaders, err := scard_ctx.ListReaders()
-		if err != nil {
-			// TODO With pcsclite this fails if there are no smart card readers. Too noisy.
+		if err != nil && err != scard.ErrNoReadersAvailable {
 			log.WithError(err).Debug("Error listing readers.")
 		}
 		updateKnownReaders(log, onReadersChange, newReaders)
