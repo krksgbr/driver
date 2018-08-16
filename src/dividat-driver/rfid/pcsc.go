@@ -16,7 +16,7 @@ Connection to the PC/SC service occurs through scard, a Go wrapper that
 harmonizes the PC/SC implementations of the various OS.
 
 This implementation has been tested with ACS ACR122U readers and Mifare 1K
-Classic tags.
+Classic as well as FeliCa tags.
 
 */
 
