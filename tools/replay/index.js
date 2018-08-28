@@ -53,7 +53,7 @@ function listenForConnection (host, port) {
 }
 
 // Create a never ending stream of data
-function Replayer (recFile, timeout) {
+function Replayer (recFile) {
   var emitter = new EventEmitter()
 
   function createStream () {
@@ -62,7 +62,17 @@ function Replayer (recFile, timeout) {
     stream.on('data', (data) => {
       stream.pause()
 
-      var buf = Buffer.from(data.toString(), 'base64')
+      var items = data.toString().split(',')
+      var msg
+      var timeout
+      if (items.length === 2) {
+        msg = items[1]
+        timeout = items[0]
+      } else {
+        msg = items[0]
+        timeout = 20
+      }
+      var buf = Buffer.from(msg, 'base64')
       emitter.emit('data', buf)
 
       setTimeout(() => {
@@ -90,11 +100,8 @@ const profile = {
   }
 }
 var recFile = argv['_'].pop() || 'rec/zero.dat'
-var dataTimeout = 't' in argv
-    ? argv['t']
-    : 20
 
-const dataStream = Replayer(recFile, dataTimeout)
+const dataStream = Replayer(recFile)
 
 // Advertise Senso via mDNS
 bonjour.publish({
