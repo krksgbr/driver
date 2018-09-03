@@ -10,6 +10,7 @@
 ### Added
 
 - Support for Windows platform
+- Tool to record data from Senso
 
 ## [2.0.0] - 2018-04-09
 

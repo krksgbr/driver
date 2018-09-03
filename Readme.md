@@ -73,12 +73,14 @@ Please have a look at the [script](install.ps1) before running it on your system
 
 ## Tools
 
+### Data recorder
+
+Data from Senso can be recorded using the [`recorder`](src/dividat-driver/recorder). Start it with `make record > foo.dat`. The created recording can be used by the replayer.
+
 ### Data replayer
 
-Logged data can be replayed for debugging purposes.
+Recorded data can be replayed for debugging purposes.
 
 For default settings: `npm run replay`
 
 To replay an other recording: `npm run replay -- rec/simple.dat`
-
-To slow down the replay: `npm run replay -- -t 100`
