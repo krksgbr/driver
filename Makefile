@@ -49,6 +49,17 @@ test: build
 	npm test
 
 
+### Helper to quickly run the driver
+.PHONY: run
+run: build
+	$(OUT)
+
+### Helper to start the recorder
+.PHONY: recorder
+recorder:
+	@go run src/dividat-driver/recorder/main.go
+
+
 ### Cross compilation #####################################
 LINUX_BIN = bin/dividat-driver-linux-amd64
 .PHONY: $(LINUX_BIN)
