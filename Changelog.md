@@ -1,15 +1,15 @@
 # Change Log
 
-## [UNRELEASED]
+## [2.1.0] - 2018-09-18
 
 ### Changed
 
 - Improvements to build system, in particular the crossbuild system for building releases.
-- Add support for listing SmartCard readers and subscribing to card UIDs
 
 ### Added
 
 - Support for Windows platform
+- Support for listing SmartCard readers and subscribing to card UIDs
 
 ## [2.0.0] - 2018-04-09
 
