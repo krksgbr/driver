@@ -45,14 +45,14 @@ build:
 
 ### Test suite ############################################
 .PHONY: test
-test:
+test: build
 	npm install
 	npm test
 
 
 ### Helper to quickly run the driver
 .PHONY: run
-run:
+run: build
 	$(OUT)
 
 ### Helper to start the recorder
