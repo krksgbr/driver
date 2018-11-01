@@ -56,8 +56,8 @@ run: build
 	$(OUT)
 
 ### Helper to start the recorder
-.PHONY: recorder
-recorder:
+.PHONY: record
+record:
 	@go run src/dividat-driver/recorder/main.go
 
 
