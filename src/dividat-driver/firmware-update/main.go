@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pin/tftp"
@@ -42,7 +43,7 @@ func main() {
 		ctx, _ := context.WithTimeout(mainCtx, 5 * time.Second)
 		discoveredAddr, err := discover("_sensoControl._tcp", ctx)
 		if err != nil {
-			abort("Could not discover Senso.")
+			abort(err.Error())
 		}
 
 		controllerHost = discoveredAddr
@@ -66,7 +67,7 @@ func main() {
 			ctx, _ := context.WithTimeout(mainCtx, 30 * time.Second)
 			legacyDiscoveredAddr, err := discover("_sensoControl._tcp", ctx)
 			if err != nil {
-				abort("Could not discover Senso.")
+				abort(err.Error())
 			}
 			dfuHost = legacyDiscoveredAddr
 		} else {
@@ -105,11 +106,9 @@ func sendDfuCommand(host string, port string) error {
 
 	command := append(header, body...)
 
-	fmt.Printf("Connecting to %s:%s to send DFU command.\n", host, port)
-
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", host, port))
 	if err != nil {
-		return fmt.Errorf("Could not dial connection to Senso controller: %v", err)
+		return fmt.Errorf("Could not dial connection to Senso controller at %s:%s: %v", host, port, err)
 	}
 	defer conn.Close()
 	time.Sleep(1 * time.Second)
@@ -163,14 +162,44 @@ func discover(service string, ctx context.Context) (addr string, err error) {
 		return
 	}
 
+	devices := make(map[string][]string)
+	entriesWithoutSerial := 0
 	select {
 	case entry := <-entries:
-		if len(entry.AddrIPv4) != 1 {
-			fmt.Printf("Multiple IPs found: %v\n", entry.AddrIPv4)
+		if entry == nil {
+			break
 		}
-		addr = entry.AddrIPv4[0].String()
-	case <-ctx.Done():
-		err = errors.New("Timed out trying to discover Senso.")
+
+		var serial string
+		for ix, txt := range entry.Text {
+			if strings.HasPrefix(txt, "ser_no=") {
+				serial = strings.TrimPrefix(txt, "ser_no=")
+				break
+			} else if ix == len(entry.Text) - 1 {
+				entriesWithoutSerial++
+				serial = fmt.Sprintf("UNKNOWN-%d", entriesWithoutSerial)
+			}
+		}
+		for _, addrCandidate := range entry.AddrIPv4 {
+			if addrCandidate.String() == "0.0.0.0" {
+				fmt.Printf("Skipping discovered address 0.0.0.0 for %s.\n", serial)
+			} else {
+				devices[serial] = append(devices[serial], addrCandidate.String())
+			}
+		}
+	}
+
+	if len(devices) == 0 {
+		err = errors.New("No Sensos discovered.")
+	} else if len(devices) == 1 {
+		for serial, addrs := range devices {
+			addr = addrs[0]
+			fmt.Printf("Discovered %s at %v, using %s.\n", serial, addrs, addr)
+			return
+		}
+	} else {
+		err = fmt.Errorf("Discovered multiple Sensos: %v. Please specify an IP.", devices)
+		return
 	}
 	return
 }
