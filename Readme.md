@@ -84,3 +84,5 @@ Recorded data can be replayed for debugging purposes.
 For default settings: `npm run replay`
 
 To replay an other recording: `npm run replay -- rec/simple.dat`
+
+To change the replay speed: `npm run replay -- --speed=0.5 rec/simple.dat`

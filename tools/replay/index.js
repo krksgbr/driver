@@ -77,7 +77,7 @@ function Replayer (recFile) {
 
       setTimeout(() => {
         stream.resume()
-      }, timeout)
+      }, timeout * speedFactor)
     }).on('end', () => {
       createStream()
     })
@@ -100,6 +100,7 @@ const profile = {
   }
 }
 var recFile = argv['_'].pop() || 'rec/zero.dat'
+let speedFactor = 1/(parseFloat(argv['speed']) || 1)
 
 const dataStream = Replayer(recFile)
 
