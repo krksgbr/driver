@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pin/tftp"
 	"github.com/grandcat/zeroconf"
+	"github.com/pin/tftp"
 )
 
 // Flags
@@ -29,7 +29,6 @@ func Command(flags []string) {
 	sensoSerial := updateFlags.String("s", "", "Senso serial (optional)")
 	updateFlags.Parse(flags)
 
-
 	var deviceSerial *string = nil
 	if *sensoSerial != "" {
 		deviceSerial = sensoSerial
@@ -41,20 +40,26 @@ func Command(flags []string) {
 	}
 	file, err := os.Open(*imagePath)
 	if err != nil {
-		abort(fmt.Sprintf("Could not open image file: %v", err))
+		fmt.Printf("Could not open image file: %v\n", err)
+		os.Exit(1)
 	}
 
-	Update(context.Background(), file, deviceSerial, configuredAddr)
+	err = Update(context.Background(), file, deviceSerial, configuredAddr)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 }
 
-func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string) {
+func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string) (fail error) {
 	// Discover Senso IP
 	var controllerHost string
 	if *configuredAddr == "" {
-		ctx, _ := context.WithTimeout(parentCtx, 5 * time.Second)
+		ctx, _ := context.WithTimeout(parentCtx, 5*time.Second)
 		discoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx)
 		if err != nil {
-			abort(err.Error())
+			fail = err
+			return
 		}
 
 		controllerHost = discoveredAddr
@@ -65,17 +70,18 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 	// Request reboot into boot controller
 	err := sendDfuCommand(controllerHost, controllerPort)
 	if err != nil {
-		abort(err.Error())
+		fail = err
+		return
 	}
 
 	// Re-discover Senso IP in case it changes on reboot
 	var dfuHost string
 	if *configuredAddr == "" {
-		ctx, _ := context.WithTimeout(parentCtx, 30 * time.Second)
+		ctx, _ := context.WithTimeout(parentCtx, 30*time.Second)
 		discoveredAddr, err := discover("_sensoUpdate._udp", deviceSerial, ctx)
 		if err != nil {
 			// Try to discover boot controller via legacy identifier
-			ctx, _ := context.WithTimeout(parentCtx, 30 * time.Second)
+			ctx, _ := context.WithTimeout(parentCtx, 30*time.Second)
 			legacyDiscoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx)
 			if err != nil {
 				fmt.Printf("Could not discover update service, trying to fall back to previous discovery %s.\n", controllerHost)
@@ -96,17 +102,19 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 	// Transmit firmware via TFTP
 	err = putTFTP(dfuHost, tftpPort, image)
 	if err != nil {
-		abort(err.Error())
+		fail = err
+		return
 	}
-	fmt.Println("Firmware transmitted to Senso.")
+	fmt.Println("✓ Firmware transmitted to Senso.")
+	return
 }
 
 func sendDfuCommand(host string, port string) error {
 	// Header
 	const PROTOCOL_VERSION = 0x00
 	const NUMOFBLOCKS = 0x01
-	reserve := bytes.Repeat([]byte{ 0x00 }, 6)
-	header := append([]byte{ PROTOCOL_VERSION, NUMOFBLOCKS }, reserve...)
+	reserve := bytes.Repeat([]byte{0x00}, 6)
+	header := append([]byte{PROTOCOL_VERSION, NUMOFBLOCKS}, reserve...)
 
 	// Message Body
 	const BLOCKLENGTH = 0x0008
@@ -184,7 +192,7 @@ func discover(service string, deviceSerial *string, ctx context.Context) (addr s
 			if strings.HasPrefix(txt, "ser_no=") {
 				serial = strings.TrimPrefix(txt, "ser_no=")
 				break
-			} else if ix == len(entry.Text) - 1 {
+			} else if ix == len(entry.Text)-1 {
 				entriesWithoutSerial++
 				serial = fmt.Sprintf("UNKNOWN-%d", entriesWithoutSerial)
 			}
@@ -201,8 +209,6 @@ func discover(service string, deviceSerial *string, ctx context.Context) (addr s
 		}
 	}
 
-
-
 	if len(devices) == 0 && deviceSerial == nil {
 		err = errors.New("No Sensos discovered.")
 	} else if len(devices) == 0 && deviceSerial != nil {
@@ -218,9 +224,4 @@ func discover(service string, deviceSerial *string, ctx context.Context) (addr s
 		return
 	}
 	return
-}
-
-func abort(msg string) {
-	fmt.Println(msg)
-	os.Exit(1)
 }
