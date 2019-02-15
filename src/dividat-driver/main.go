@@ -6,9 +6,11 @@ import (
 	"context"
 	"io/ioutil"
 	"log"
+	"os"
 
 	"dividat-driver/logging"
 	"dividat-driver/server"
+	"dividat-driver/firmware"
 
 	"github.com/kardianos/service"
 	"github.com/sirupsen/logrus"
@@ -16,6 +18,14 @@ import (
 
 type program struct {
 	close context.CancelFunc
+}
+
+func main() {
+	if len(os.Args) > 1 && os.Args[1] == "update-firmware" {
+		firmware.Command(os.Args[2:])
+	} else {
+		runDaemon()
+	}
 }
 
 func (p *program) Start(s service.Service) error {
@@ -32,12 +42,13 @@ func (p *program) Start(s service.Service) error {
 	p.close = server.Start(logger)
 	return nil
 }
+
 func (p *program) Stop(s service.Service) error {
 	p.close()
 	return nil
 }
 
-func main() {
+func runDaemon() {
 	svcConfig := &service.Config{
 		Name:        "DividatDriver",
 		DisplayName: "Dividat Driver",

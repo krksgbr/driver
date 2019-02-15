@@ -1,4 +1,4 @@
-package main
+package firmware
 
 import (
 	"bytes"
@@ -10,7 +10,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,28 +19,40 @@ import (
 
 // Flags
 
-var tftpPort = flag.String("p", "69", "TFTP port")
-var configuredAddr = flag.String("a", "", "Senso address")
-var imagePath = flag.String("i", "", "Firmware image path")
-var controllerPort = "55567"
+const tftpPort = "69"
+const controllerPort = "55567"
 
-func init() {
-	flag.Parse()
-}
+func Command(flags []string) {
+	updateFlags := flag.NewFlagSet("update", flag.ExitOnError)
+	imagePath := updateFlags.String("i", "", "Firmware image path")
+	configuredAddr := updateFlags.String("a", "", "Senso address (optional)")
+	sensoSerial := updateFlags.String("s", "", "Senso serial (optional)")
+	updateFlags.Parse(flags)
 
-func main() {
+
+	var deviceSerial *string = nil
+	if *sensoSerial != "" {
+		deviceSerial = sensoSerial
+	}
+
 	if *imagePath == "" {
 		flag.PrintDefaults()
 		return
 	}
-	
-	mainCtx := context.Background()
+	file, err := os.Open(*imagePath)
+	if err != nil {
+		abort(fmt.Sprintf("Could not open image file: %v", err))
+	}
 
+	Update(context.Background(), file, deviceSerial, configuredAddr)
+}
+
+func Update(ctx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string) {
 	// Discover Senso IP
 	var controllerHost string
 	if *configuredAddr == "" {
-		ctx, _ := context.WithTimeout(mainCtx, 5 * time.Second)
-		discoveredAddr, err := discover("_sensoControl._tcp", ctx)
+		ctx, _ := context.WithTimeout(ctx, 5 * time.Second)
+		discoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx)
 		if err != nil {
 			abort(err.Error())
 		}
@@ -60,12 +71,12 @@ func main() {
 	// Re-discover Senso IP in case it changes on reboot
 	var dfuHost string
 	if *configuredAddr == "" {
-		ctx, _ := context.WithTimeout(mainCtx, 30 * time.Second)
-		discoveredAddr, err := discover("_sensoUpdate._udp", ctx)
+		ctx, _ := context.WithTimeout(ctx, 60 * time.Second)
+		discoveredAddr, err := discover("_sensoUpdate._udp", deviceSerial, ctx)
 		if err != nil {
 			// Try to discover boot controller via legacy identifier
-			ctx, _ := context.WithTimeout(mainCtx, 30 * time.Second)
-			legacyDiscoveredAddr, err := discover("_sensoControl._tcp", ctx)
+			ctx, _ := context.WithTimeout(ctx, 60 * time.Second)
+			legacyDiscoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx)
 			if err != nil {
 				abort(err.Error())
 			}
@@ -81,7 +92,7 @@ func main() {
 	time.Sleep(5 * time.Second)
 
 	// Transmit firmware via TFTP
-	err = putTFTP(dfuHost, *tftpPort, *imagePath)
+	err = putTFTP(dfuHost, tftpPort, image)
 	if err != nil {
 		abort(err.Error())
 	}
@@ -123,20 +134,16 @@ func sendDfuCommand(host string, port string) error {
 	return nil
 }
 
-func putTFTP(host string, port string, filePath string) error {
-	c, err := tftp.NewClient(fmt.Sprintf("%s:%s", host, port))
+func putTFTP(host string, port string, image io.Reader) error {
+	client, err := tftp.NewClient(fmt.Sprintf("%s:%s", host, port))
 	if err != nil {
 		return fmt.Errorf("Could not create tftp client: %v", err)
 	}
-	file, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("Could not open file: %v", err)
-	}
-	rf, err := c.Send(filepath.Base(*imagePath), "octet")
+	rf, err := client.Send("controller-app.bin", "octet")
 	if err != nil {
 		return fmt.Errorf("Could not create send connection: %v", err)
 	}
-	n, err := rf.ReadFrom(file)
+	n, err := rf.ReadFrom(image)
 	if err != nil {
 		return fmt.Errorf("Could not read from file: %v", err)
 	}
@@ -144,7 +151,7 @@ func putTFTP(host string, port string, filePath string) error {
 	return nil
 }
 
-func discover(service string, ctx context.Context) (addr string, err error) {
+func discover(service string, deviceSerial *string, ctx context.Context) (addr string, err error) {
 
 	resolver, err := zeroconf.NewResolver(nil)
 	if err != nil {
@@ -180,6 +187,9 @@ func discover(service string, ctx context.Context) (addr string, err error) {
 				serial = fmt.Sprintf("UNKNOWN-%d", entriesWithoutSerial)
 			}
 		}
+		if deviceSerial != nil && serial != *deviceSerial {
+			break
+		}
 		for _, addrCandidate := range entry.AddrIPv4 {
 			if addrCandidate.String() == "0.0.0.0" {
 				fmt.Printf("Skipping discovered address 0.0.0.0 for %s.\n", serial)
@@ -189,8 +199,12 @@ func discover(service string, ctx context.Context) (addr string, err error) {
 		}
 	}
 
-	if len(devices) == 0 {
+
+
+	if len(devices) == 0 && deviceSerial == nil {
 		err = errors.New("No Sensos discovered.")
+	} else if len(devices) == 0 && deviceSerial != nil {
+		err = fmt.Errorf("Could not find Senso %s.", *deviceSerial)
 	} else if len(devices) == 1 {
 		for serial, addrs := range devices {
 			addr = addrs[0]
@@ -198,7 +212,7 @@ func discover(service string, ctx context.Context) (addr string, err error) {
 			return
 		}
 	} else {
-		err = fmt.Errorf("Discovered multiple Sensos: %v. Please specify an IP.", devices)
+		err = fmt.Errorf("Discovered multiple Sensos: %v. Please specify a serial or IP.", devices)
 		return
 	}
 	return
