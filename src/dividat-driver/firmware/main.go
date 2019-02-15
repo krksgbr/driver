@@ -47,11 +47,11 @@ func Command(flags []string) {
 	Update(context.Background(), file, deviceSerial, configuredAddr)
 }
 
-func Update(ctx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string) {
+func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string) {
 	// Discover Senso IP
 	var controllerHost string
 	if *configuredAddr == "" {
-		ctx, _ := context.WithTimeout(ctx, 5 * time.Second)
+		ctx, _ := context.WithTimeout(parentCtx, 5 * time.Second)
 		discoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx)
 		if err != nil {
 			abort(err.Error())
@@ -71,16 +71,18 @@ func Update(ctx context.Context, image io.Reader, deviceSerial *string, configur
 	// Re-discover Senso IP in case it changes on reboot
 	var dfuHost string
 	if *configuredAddr == "" {
-		ctx, _ := context.WithTimeout(ctx, 60 * time.Second)
+		ctx, _ := context.WithTimeout(parentCtx, 30 * time.Second)
 		discoveredAddr, err := discover("_sensoUpdate._udp", deviceSerial, ctx)
 		if err != nil {
 			// Try to discover boot controller via legacy identifier
-			ctx, _ := context.WithTimeout(ctx, 60 * time.Second)
+			ctx, _ := context.WithTimeout(parentCtx, 30 * time.Second)
 			legacyDiscoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx)
 			if err != nil {
-				abort(err.Error())
+				fmt.Printf("Could not discover update service, trying to fall back to previous discovery %s.\n", controllerHost)
+				dfuHost = controllerHost
+			} else {
+				dfuHost = legacyDiscoveredAddr
 			}
-			dfuHost = legacyDiscoveredAddr
 		} else {
 			dfuHost = discoveredAddr
 		}
