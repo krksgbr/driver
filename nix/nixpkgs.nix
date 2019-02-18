@@ -5,6 +5,6 @@ in
   import (_nixpkgs.fetchFromGitHub 
   { owner = "NixOS"
   ; repo = "nixpkgs"
-  ; rev = "9af0ed346d710afbaa37b44b651199381c37543a"
-  ; sha256 = "1n37piclgaqp8nsk439rhawqpdchj9fbvx8qbxxrhmh3bh7mwxyh"; })
+  ; rev = "18.09"
+  ; sha256 = "1ib96has10v5nr6bzf7v8kw7yzww8zanxgw2qi1ll1sbv6kj6zpd"; })
 

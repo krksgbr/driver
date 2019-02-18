@@ -18,7 +18,7 @@ buildGoPackage rec {
         gcc
 
         nix-prefetch-git
-        (import ./nix/deps2nix {inherit stdenv fetchFromGitHub buildGoPackage;})
+        dep2nix
         # node for tests
         nodejs-8_x
 
@@ -35,6 +35,6 @@ buildGoPackage rec {
       ]
       # PCSC on Darwin
       ++ lib.optional stdenv.isDarwin pkgs.darwin.apple_sdk.frameworks.PCSC
-      ++ lib.optional stdenv.isLinux [ pcsclite ];
+      ++ lib.optional stdenv.isLinux pcsclite;
 
 }

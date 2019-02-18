@@ -2,89 +2,112 @@
 
 
 [[projects]]
+  digest = "1:1cf61f0228e64d1bfddaa42bfd1f5047ed3626925b9bea69bbcb9168472dae23"
   name = "github.com/cenkalti/backoff"
   packages = ["."]
+  pruneopts = ""
   revision = "61153c768f31ee5f130071d08fc82b85208528de"
   version = "v1.1.0"
 
 [[projects]]
+  digest = "1:8495649476b2da658de5f993fa2758f342114ce057b6c559d26cf380447eaed8"
   name = "github.com/coreos/go-semver"
   packages = ["semver"]
-  revision = "1817cd4bea52af76542157eeabd74b057d1a199e"
+  pruneopts = ""
+  revision = "e214231b295a8ea9479f11b70b35d5acf3556d9b"
 
 [[projects]]
-  branch = "master"
+  digest = "1:b4ea842b8118fa30a97605815a07f2126863087d4232cf5678dbd4da77ce4992"
   name = "github.com/cskr/pubsub"
   packages = ["."]
-  revision = "d0cbfe51c9165ee318238cab8ba70ff068245502"
+  pruneopts = ""
+  revision = "65166f5ae403cbf6dcdced31e1f8f8ad95485cb3"
+  version = "v1.0.2"
 
 [[projects]]
+  digest = "1:dd27cd52e554ee6f111ced8efe09ab20c10a4ee26283e5d7a907bed87fcdb06d"
   name = "github.com/denisbrodbeck/machineid"
   packages = ["."]
-  revision = "e59b4a9b1b28de48436e47104472050658bacfcf"
+  pruneopts = ""
+  revision = "e2e48f90c87f1f77286682531a46ff99e95d8089"
+  version = "v1.0.0"
 
 [[projects]]
+  digest = "1:814d12a1496ba929378f290258b1d4175c6460dcf46dd341ca0871d47238212a"
   name = "github.com/ebfe/scard"
   packages = ["."]
-  revision = "136eebbd7d749e6354ed1bb105b88f89c7d80b03"
+  pruneopts = ""
+  revision = "c3d1b1916a9547038c82830d7e99fa36b85a2682"
 
 [[projects]]
+  digest = "1:e2766c5ca6578e62dfd0dca4eb40d4e3470c52a92abdf8f66e57d79f4d13ef5f"
   name = "github.com/gorilla/websocket"
   packages = ["."]
-  revision = "ea4d1f681babbce9545c9c5f3d5194a789c89f5b"
-  version = "v1.2.0"
+  pruneopts = ""
+  revision = "3ff3320c2a1756a3691521efc290b4701575147c"
+  version = "v1.3.0"
 
 [[projects]]
+  digest = "1:b152e3905144b9f3952359bccc1f07e5fde184918e5b8ebfb5e48a2bf0f35715"
   name = "github.com/grandcat/zeroconf"
   packages = ["."]
-  revision = "2f133dcabb8c1dc0e63ec6bb9e2c405179db3033"
+  pruneopts = ""
+  revision = "c2d1b4121200e6bf8490af806aa6f3dc6d37446b"
 
 [[projects]]
-  branch = "master"
+  digest = "1:32c49a8cbcb20989c4fc0825f792cb1ea079af601c11b5ed0a92a48433171db3"
   name = "github.com/inconshreveable/go-update"
   packages = [
     ".",
     "internal/binarydist",
-    "internal/osext"
+    "internal/osext",
   ]
+  pruneopts = ""
   revision = "8152e7eb6ccf8679a64582a66b78519688d156ad"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/kardianos/osext"
-  packages = ["."]
-  revision = "ae77be60afb1dcacde03767a8c37337fad28ac14"
-
-[[projects]]
+  digest = "1:b498ceccf0d2efa0af877b1dda20d3742ef9ff7475123e8e922016f0b737069b"
   name = "github.com/kardianos/service"
   packages = ["."]
-  revision = "14a49b39b37b67e7c4d0f9df86ff005c55e539ff"
+  pruneopts = ""
+  revision = "56787a3ea05e9b262708192e7ce3b500aba73561"
+  version = "v1.0.0"
 
 [[projects]]
+  digest = "1:105fe7dea39cca03fc09a82c562494c9afa4109acfd686052a33d4afed5012fa"
   name = "github.com/miekg/dns"
   packages = [
     ".",
-    "internal/socket"
+    "internal/socket",
   ]
+  pruneopts = ""
   revision = "a5852667e3c36e2e0b0a69ab43869e00e95aacdf"
 
 [[projects]]
+  digest = "1:3fcbf733a8d810a21265a7f2fe08a3353db2407da052b233f8b204b5afc03d9b"
   name = "github.com/sirupsen/logrus"
   packages = ["."]
-  revision = "d682213848ed68c0a260ca37d6dd5ace8423f5ba"
-  version = "v1.0.4"
+  pruneopts = ""
+  revision = "3e01752db0189b9157070a0e1668a620f9a85da2"
+  version = "v1.0.6"
 
 [[projects]]
+  digest = "1:76a91301349f62d563ca006d7719bde8850bff475bfdcbbef1ca458fe4e5ae42"
   name = "github.com/streadway/amqp"
   packages = ["."]
-  revision = "ff34ec9cc65c2a23db5126d962c431018f65af59"
+  pruneopts = ""
+  revision = "884228600bc96c993ab12fb81ba78bf0c280e88a"
 
 [[projects]]
+  branch = "master"
+  digest = "1:5462386895a322b94a79a5de7314310edbd5f4d15f851ae032f146b2c951b3de"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "2509b142fb2b797aa7587dad548f113b2c0f20ce"
+  pruneopts = ""
+  revision = "74369b46fc6756741c016591724fd1cb8e26845f"
 
 [[projects]]
+  digest = "1:e3fd71c3687fb1d263e491fc3bd9013858aeb30a6393fc9b77cbbdc37d0f9727"
   name = "golang.org/x/net"
   packages = [
     "bpf",
@@ -92,11 +115,13 @@
     "internal/iana",
     "internal/socket",
     "ipv4",
-    "ipv6"
+    "ipv6",
   ]
+  pruneopts = ""
   revision = "c73622c77280266305273cb545f54516ced95b93"
 
 [[projects]]
+  digest = "1:e9f555036bb1a2f61074131371313348581fa1b643c0e5f8c0a436bf7ce6db69"
   name = "golang.org/x/sys"
   packages = [
     "unix",
@@ -104,13 +129,26 @@
     "windows/registry",
     "windows/svc",
     "windows/svc/eventlog",
-    "windows/svc/mgr"
+    "windows/svc/mgr",
   ]
+  pruneopts = ""
   revision = "314a259e304ff91bd6985da2a7149bbf91237993"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b47a069bc5fcb7ee697fca8d8dd8be071910d5cb23e62f17cd28385888a1992f"
+  input-imports = [
+    "github.com/cenkalti/backoff",
+    "github.com/coreos/go-semver/semver",
+    "github.com/cskr/pubsub",
+    "github.com/denisbrodbeck/machineid",
+    "github.com/ebfe/scard",
+    "github.com/gorilla/websocket",
+    "github.com/grandcat/zeroconf",
+    "github.com/inconshreveable/go-update",
+    "github.com/kardianos/service",
+    "github.com/sirupsen/logrus",
+    "github.com/streadway/amqp",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
