@@ -17,8 +17,6 @@ import (
 	"github.com/pin/tftp"
 )
 
-// Flags
-
 const tftpPort = "69"
 const controllerPort = "55567"
 
