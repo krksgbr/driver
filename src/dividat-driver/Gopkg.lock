@@ -84,6 +84,16 @@
   revision = "a5852667e3c36e2e0b0a69ab43869e00e95aacdf"
 
 [[projects]]
+  digest = "1:29ec66aa13cb93e48d8f8506002f23001e76b7b5c96b30d7e58c40208bb1497d"
+  name = "github.com/pin/tftp"
+  packages = [
+    ".",
+    "netascii",
+  ]
+  pruneopts = ""
+  revision = "5d40004dd1982bf3cca8dde29fee6d187d942e63"
+
+[[projects]]
   digest = "1:3fcbf733a8d810a21265a7f2fe08a3353db2407da052b233f8b204b5afc03d9b"
   name = "github.com/sirupsen/logrus"
   packages = ["."]
@@ -147,6 +157,7 @@
     "github.com/grandcat/zeroconf",
     "github.com/inconshreveable/go-update",
     "github.com/kardianos/service",
+    "github.com/pin/tftp",
     "github.com/sirupsen/logrus",
     "github.com/streadway/amqp",
   ]

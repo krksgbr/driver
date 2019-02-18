@@ -59,6 +59,10 @@ ignored = ["server","senso"]
   version = "~1.0.0"
 
 [[constraint]]
+  name = "github.com/pin/tftp"
+  revision = "5d40004dd1982bf3cca8dde29fee6d187d942e63"
+
+[[constraint]]
   name = "github.com/sirupsen/logrus"
   version = "=1.0.6"
 
