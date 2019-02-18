@@ -18,7 +18,7 @@ buildGoPackage rec {
         gcc
 
         nix-prefetch-git
-        (import ./nix/deps2nix {inherit stdenv fetchFromGitHub buildGoPackage;})
+        dep2nix
         # node for tests
         nodejs-8_x
 
