@@ -35,6 +35,6 @@ buildGoPackage rec {
       ]
       # PCSC on Darwin
       ++ lib.optional stdenv.isDarwin pkgs.darwin.apple_sdk.frameworks.PCSC
-      ++ lib.optional stdenv.isLinux [ pcsclite ];
+      ++ lib.optional stdenv.isLinux pcsclite;
 
 }
