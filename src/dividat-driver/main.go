@@ -21,6 +21,7 @@ type program struct {
 }
 
 func main() {
+	// Serve command or start in daemon mode by default
 	if len(os.Args) > 1 && os.Args[1] == "update-firmware" {
 		firmware.Command(os.Args[2:])
 	} else {

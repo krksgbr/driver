@@ -20,6 +20,7 @@ import (
 const tftpPort = "69"
 const controllerPort = "55567"
 
+// Command-line interface to Update
 func Command(flags []string) {
 	updateFlags := flag.NewFlagSet("update", flag.ExitOnError)
 	imagePath := updateFlags.String("i", "", "Firmware image path")
@@ -49,6 +50,7 @@ func Command(flags []string) {
 	}
 }
 
+// Firmware update workhorse
 func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string) (fail error) {
 	// Discover Senso IP
 	var controllerHost string
@@ -163,7 +165,6 @@ func putTFTP(host string, port string, image io.Reader) error {
 }
 
 func discover(service string, deviceSerial *string, ctx context.Context) (addr string, err error) {
-
 	resolver, err := zeroconf.NewResolver(nil)
 	if err != nil {
 		err = fmt.Errorf("Initializing discovery failed: %v", err)
@@ -226,3 +227,4 @@ func discover(service string, deviceSerial *string, ctx context.Context) (addr s
 	}
 	return
 }
+
