@@ -109,6 +109,13 @@
   revision = "884228600bc96c993ab12fb81ba78bf0c280e88a"
 
 [[projects]]
+  digest = "1:5a80808c3292ff8a8a7c340b8e4b4b4253eae8a6831fa3d506b232c8f5564ccf"
+  name = "github.com/tarm/serial"
+  packages = ["."]
+  pruneopts = ""
+  revision = "98f6abe2eb07edd42f6dfa2a934aea469acc29b7"
+
+[[projects]]
   branch = "master"
   digest = "1:5462386895a322b94a79a5de7314310edbd5f4d15f851ae032f146b2c951b3de"
   name = "golang.org/x/crypto"
@@ -160,6 +167,7 @@
     "github.com/pin/tftp",
     "github.com/sirupsen/logrus",
     "github.com/streadway/amqp",
+    "github.com/tarm/serial",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

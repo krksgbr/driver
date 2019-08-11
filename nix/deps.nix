@@ -118,6 +118,15 @@
     };
   }
   {
+    goPackagePath  = "github.com/tarm/serial";
+    fetch = {
+      type = "git";
+      url = "https://github.com/tarm/serial";
+      rev =  "98f6abe2eb07edd42f6dfa2a934aea469acc29b7";
+      sha256 = "1yj4jiv2f3x3iawxdflrlmdan0k9xsbnccgc9yz658rmif1ag3pb";
+    };
+  }
+  {
     goPackagePath  = "golang.org/x/crypto";
     fetch = {
       type = "git";

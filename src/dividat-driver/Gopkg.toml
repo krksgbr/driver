@@ -69,3 +69,7 @@ ignored = ["server","senso"]
 [[constraint]]
   name = "github.com/streadway/amqp"
   revision = "884228600bc96c993ab12fb81ba78bf0c280e88a"
+
+[[constraint]]
+  name = "github.com/tarm/serial"
+  revision = "98f6abe2eb07edd42f6dfa2a934aea469acc29b7"
