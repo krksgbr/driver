@@ -92,6 +92,8 @@ const (
 	WaitingForFirstHeader ReaderState = iota
 	HeaderStarted
 	ExpectingHeaderEnd
+	RowStarted
+	WaitingForRowIndex
 	ReadingRowData
 	ReachedRowEnd
 	UnexpectedByte
@@ -99,7 +101,7 @@ const (
 
 func connectSerial(ctx context.Context, baseLogger *logrus.Entry, address string, onReceive func([]byte)) {
 	config := &serial.Config{
-		Name: "/dev/ttyAMA0",
+		Name: "/dev/ttyACM0",
 		Baud: 115200,
 		ReadTimeout: 100 * time.Millisecond,
 		Size: 8,
@@ -121,6 +123,7 @@ func connectSerial(ctx context.Context, baseLogger *logrus.Entry, address string
 
         reader := bufio.NewReader(serialHandle)
 	state := WaitingForFirstHeader
+	bytesLeftInRow := 0
 
         var buff []byte
         for {
@@ -130,24 +133,37 @@ func connectSerial(ctx context.Context, baseLogger *logrus.Entry, address string
                         break
                 }
 
-                if state == WaitingForFirstHeader && input == 0x48 {
+		switch {
+		case state == WaitingForFirstHeader && input == 0x48:
 			state = HeaderStarted
-                } else if state == ReachedRowEnd && input == 0x48 {
+		case state == ReachedRowEnd && input == 0x48:
 			state = HeaderStarted
 			fmt.Println()
 			fmt.Printf("%x\n", buff)
 			onReceive(buff)
                         buff = []byte{}
-		} else if state == HeaderStarted && input == 0x00 {
+		case state == HeaderStarted && input == 0x00:
 			state = ExpectingHeaderEnd
-		} else if state == ExpectingHeaderEnd && input == 0x0A {
+		case state == ExpectingHeaderEnd && input == 0x0A:
 			state = ReachedRowEnd
-		} else if state == ReadingRowData && input == 0x0A {
+		case state == ReadingRowData && bytesLeftInRow > 0:
+			bytesLeftInRow = bytesLeftInRow - 1
+			buff = append(buff, input)
+		case state == ReadingRowData && bytesLeftInRow == 0 && input == 0x0A:
 			state = ReachedRowEnd
-		} else if state == ReachedRowEnd && input == 0x4D {
+			buff = append(buff, input)
+		case state == ReachedRowEnd && input == 0x4D:
+			state = RowStarted
+			buff = append(buff, input)
+		case state == RowStarted:
+			state = WaitingForRowIndex
+			// 2 bytes per sample
+			bytesLeftInRow = int(input) * 2
+			buff = append(buff, input)
+		case state == WaitingForRowIndex:
 			state = ReadingRowData
 			buff = append(buff, input)
-		} else if state == ReadingRowData {
+		case state == ReadingRowData:
 			buff = append(buff, input)
 		}
         }
