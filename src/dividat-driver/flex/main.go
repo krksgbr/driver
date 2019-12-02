@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
+	"encoding/binary"
 	"bufio"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"path"
@@ -130,18 +130,18 @@ func scanAndConnectSerial(ctx context.Context, logger *logrus.Entry, onReceive f
 type ReaderState int
 
 const (
-	// Init
-	WaitingForFirstHeader ReaderState = iota
-	// Header
-	HeaderStarted
-	ExpectingHeaderEnd
-	// Data row
-	RowStarted
-	WaitingForRowIndex
-	ReadingRowData
-	ReachedRowEnd
-	// Error state
-	UnexpectedByte
+	WAITING_FOR_HEADER ReaderState = iota
+	HEADER_START
+	HEADER_READ_LENGTH_MSB
+	WAITING_FOR_BODY
+	BODY_START
+	BODY_POINT
+	UNEXPECTED_BYTE
+)
+
+const (
+	HEADER_START_MARKER = 'N'
+	BODY_START_MARKER = 'P'
 )
 
 // Actually attempt to connect to an individual serial port and pipe its signal into the callback, summarizing
@@ -173,8 +173,9 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 	}
 
 	reader := bufio.NewReader(port)
-	state := WaitingForFirstHeader
-	bytesLeftInRow := 0
+	state := WAITING_FOR_HEADER
+	pointsLeftInSet := 0
+	bytesLeftInPoint := 0
 
 	var buff []byte
 	for {
@@ -192,45 +193,54 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 		}
 
 		switch {
-		case state == WaitingForFirstHeader && input == 0x48:
-			state = HeaderStarted
-		case state == ReachedRowEnd && input == 0x48:
-			state = HeaderStarted
-			fmt.Println()
-			fmt.Printf("%x\n", buff)
-			onReceive(buff)
-			buff = []byte{}
-		case state == UnexpectedByte && input == 0x48:
+		case state == WAITING_FOR_HEADER && input == HEADER_START_MARKER:
+			state = HEADER_START
+		case state == HEADER_START && input == '\n':
+			state = HEADER_READ_LENGTH_MSB
+                case state == HEADER_READ_LENGTH_MSB:
+			msb := input
+			lsb, err := reader.ReadByte()
+			if err == io.EOF {
+				break
+			} else if err != nil {
+				continue
+			}
+			pointsLeftInSet = int(binary.BigEndian.Uint16([]byte{msb,lsb}))
+			state = WAITING_FOR_BODY
+		case state == WAITING_FOR_BODY && input == BODY_START_MARKER:
+			state = BODY_START
+		case state == BODY_START && input == '\n':
+			state = BODY_POINT
+			bytesLeftInPoint = 4
+                case state == BODY_POINT:
+			buff = append(buff, input)
+			bytesLeftInPoint = bytesLeftInPoint - 1
+
+			if bytesLeftInPoint <= 0 {
+				pointsLeftInSet = pointsLeftInSet - 1
+
+				if pointsLeftInSet <= 0 {
+					// Finish and send set
+					onReceive(buff)
+					buff = []byte{}
+
+					// Get ready for next set
+					state = WAITING_FOR_HEADER
+				} else {
+					// Start next point
+					bytesLeftInPoint = 4
+				}
+			}
+		case state == UNEXPECTED_BYTE && input == HEADER_START_MARKER:
 			// Recover from error state when a new header is seen
 			buff = []byte{}
-			bytesLeftInRow = 0
-			state = HeaderStarted
-		case state == HeaderStarted && input == 0x00:
-			state = ExpectingHeaderEnd
-		case state == ExpectingHeaderEnd && input == 0x0A:
-			state = ReachedRowEnd
-		case state == ReadingRowData && bytesLeftInRow > 0:
-			bytesLeftInRow = bytesLeftInRow - 1
-			buff = append(buff, input)
-		case state == ReadingRowData && bytesLeftInRow == 0 && input == 0x0A:
-			state = ReachedRowEnd
-			buff = append(buff, input)
-		case state == ReachedRowEnd && input == 0x4D:
-			state = RowStarted
-			buff = append(buff, input)
-		case state == RowStarted:
-			state = WaitingForRowIndex
-			// 2 bytes per sample
-			bytesLeftInRow = int(input) * 2
-			buff = append(buff, input)
-		case state == WaitingForRowIndex:
-			state = ReadingRowData
-			buff = append(buff, input)
-		case state == ReadingRowData:
-			buff = append(buff, input)
+			bytesLeftInPoint = 0
+			pointsLeftInSet = 0
+			state = HEADER_START
 		default:
-			state = UnexpectedByte
+			state = UNEXPECTED_BYTE
 		}
+
 	}
 
 }
