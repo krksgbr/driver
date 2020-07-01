@@ -9,6 +9,10 @@ const EventEmitter = require('events')
 
 const control = require('./control')
 
+var recFile = argv['_'].pop() || 'rec/zero.dat'
+let speedFactor = 1/(parseFloat(argv['speed']) || 1)
+let loop = !argv['once']
+
 async function mockSenso (profile, data) {
   var socket = await listenForConnection('0.0.0.0', 55567)
 
@@ -79,7 +83,13 @@ function Replayer (recFile) {
         stream.resume()
       }, timeout * speedFactor)
     }).on('end', () => {
-      createStream()
+      if (loop) {
+        console.log('End of the record stream, looping.')
+        createStream()
+      } else {
+        console.log('End of the record stream, exiting.')
+        process.exit(0)
+      }
     })
   }
   createStream()
@@ -99,8 +109,6 @@ const profile = {
     }
   }
 }
-var recFile = argv['_'].pop() || 'rec/zero.dat'
-let speedFactor = 1/(parseFloat(argv['speed']) || 1)
 
 const dataStream = Replayer(recFile)
 
