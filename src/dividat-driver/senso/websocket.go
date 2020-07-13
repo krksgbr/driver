@@ -33,7 +33,7 @@ func prettyPrintCommand(command Command) string {
 		return "Connect"
 	} else if command.Disconnect != nil {
 		return "Disconnect"
-	} else if command.Disconnect != nil {
+	} else if command.Discover != nil {
 		return "Discover"
 	}
 	return "Unknown"
