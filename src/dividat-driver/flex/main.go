@@ -149,8 +149,7 @@ const (
 func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string, onReceive func([]byte)) {
 	config := &serial.Config{
 		Name:        serialName,
-		Baud:        460800,
-		ReadTimeout: 100 * time.Millisecond,
+		Baud:        921600,
 		Size:        8,
 		Parity:      serial.ParityNone,
 		StopBits:    serial.Stop1,
@@ -224,8 +223,14 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 					onReceive(buff)
 					buff = []byte{}
 
-					// Get ready for next set
+					// Get ready for next set and request it
 					state = WAITING_FOR_HEADER
+					_, err = port.Write([]byte{'S', '\n'})
+					if err != nil {
+						logger.WithField("error", err).Info("Failed to write poll message to serial port.")
+						port.Close()
+						return
+					}
 				} else {
 					// Start next point
 					bytesLeftInPoint = 4
