@@ -63,7 +63,9 @@ To deploy a new release run: `make deploy`. This can only be done if you are on 
 
 This application can be run as a Windows service (<https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service>).
 
-A PowerShell script is provided to download and install the latest version as a Windows service. To run the script enter following command in an administrative PowerShell:
+A PowerShell script is provided to download and install the latest version as a Windows service. Run it with the following command in a PowerShell.
+
+**Note:** You need to run it as an administrator.
 
 ```
 PS C:\ Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/dividat/driver/master/install.ps1'))
