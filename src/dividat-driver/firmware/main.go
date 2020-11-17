@@ -192,7 +192,7 @@ func discover(service string, deviceSerial *string, ctx context.Context) (addr s
 		var serial string
 		for ix, txt := range entry.Text {
 			if strings.HasPrefix(txt, "ser_no=") {
-				serial = strings.TrimPrefix(txt, "ser_no=")
+				serial = cleanSerial(strings.TrimPrefix(txt, "ser_no="))
 				break
 			} else if ix == len(entry.Text)-1 {
 				entriesWithoutSerial++
@@ -228,3 +228,11 @@ func discover(service string, deviceSerial *string, ctx context.Context) (addr s
 	return
 }
 
+func cleanSerial(serialStr string) string {
+	// Senso firmware up to 3.8.0 adds garbage at end of serial in mDNS
+	// entries due to improper string sizing.  Because bootloader firmware
+	// will not be updated via Ethernet, the problem will stay around for a
+	// while and we clean up the serial here to produce readable output for
+	// older devices.
+	return strings.Split(serialStr, "\\000")[0]
+}
