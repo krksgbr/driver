@@ -4,14 +4,6 @@
 
 Dividat drivers and hardware test suites.
 
-## Compatibility
-
-Firefox, Safari and Edge not supported as they are not yet properly implementing _loopback as a trustworthy origin_, see:
-
--   Firefox (tracking): <https://bugzilla.mozilla.org/show_bug.cgi?id=1376309>
--   Edge: <https://developer.microsoft.com/en-us/microsoft-edge/platform/issues/11963735/>
--   Safari: <https://bugs.webkit.org/show_bug.cgi?id=171934>
-
 ## Development
 
 ### Prerequisites
@@ -72,6 +64,10 @@ PS C:\ Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System
 ```
 
 Please have a look at the [script](install.ps1) before running it on your system.
+
+## Compatibility
+
+To be able to connect to the driver from within a web app delivered over HTTPS, browsers need to consider the loopback address as a trustworthy origin even when not using TLS. This is the case for most modern browsers, with the exception of Safari (https://bugs.webkit.org/show_bug.cgi?id=171934).
 
 ## Tools
 
