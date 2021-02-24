@@ -127,6 +127,9 @@ func scanAndConnectSerial(ctx context.Context, logger *logrus.Entry, onReceive f
 	}
 }
 
+
+// Serial communication
+
 type ReaderState int
 
 const (
@@ -155,8 +158,9 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 		StopBits:    serial.Stop1,
 	}
 
-	logger.WithField("address", serialName).Info("Attempting to connect with serial port.")
+	START_MEASUREMENT_CMD := []byte{'S', '\n'}
 
+	logger.WithField("address", serialName).Info("Attempting to connect with serial port.")
 	port, err := serial.OpenPort(config)
 	if err != nil {
 		logger.WithField("config", config).WithField("error", err).Info("Failed to open connection to serial port.")
@@ -164,7 +168,7 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 	}
 	defer port.Close()
 
-	_, err = port.Write([]byte{'S', '\n'})
+	_, err = port.Write(START_MEASUREMENT_CMD)
 	if err != nil {
 		logger.WithField("error", err).Info("Failed to write start message to serial port.")
 		port.Close()
@@ -225,7 +229,7 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 
 					// Get ready for next set and request it
 					state = WAITING_FOR_HEADER
-					_, err = port.Write([]byte{'S', '\n'})
+					_, err = port.Write(START_MEASUREMENT_CMD)
 					if err != nil {
 						logger.WithField("error", err).Info("Failed to write poll message to serial port.")
 						port.Close()
