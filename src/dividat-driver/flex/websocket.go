@@ -53,18 +53,16 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create channels with data received from SensingTex controller
-	rx := handle.broker.Sub("rx")
+	rx := handle.broker.Sub("flex-rx")
 
 	// send data from device
 	go rx_data_loop(ctx, rx, sendBinary)
 
 	// Helper function to close the connection
 	close := func() {
-		// Unsubscribe from broker
 		handle.broker.Unsub(rx)
 
-		// Stop serial connection
-		handle.Disconnect()
+		handle.DeregisterSubscriber()
 
 		// Cancel the context
 		cancel()

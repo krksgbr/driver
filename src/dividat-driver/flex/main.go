@@ -2,7 +2,6 @@ package flex
 
 import (
 	"context"
-	"sync"
 
 	"encoding/binary"
 	"bufio"
@@ -24,23 +23,20 @@ type Handle struct {
 	ctx context.Context
 
 	cancelCurrentConnection context.CancelFunc
-	connectionChangeMutex   *sync.Mutex
+	subscriberCount int
 
 	log *logrus.Entry
 }
 
 // New returns an initialized handler
 func New(ctx context.Context, log *logrus.Entry) *Handle {
-	handle := Handle{}
-
-	handle.ctx = ctx
-
-	handle.log = log
-
-	handle.connectionChangeMutex = &sync.Mutex{}
+	handle := Handle{
+		broker: pubsub.New(32),
+		ctx: ctx,
+		log: log,
+	}
 
 	// PubSub broker
-	handle.broker = pubsub.New(32)
 
 	// Clean up
 	go func() {
@@ -53,30 +49,29 @@ func New(ctx context.Context, log *logrus.Entry) *Handle {
 
 // Connect to device
 func (handle *Handle) Connect() {
+	if handle.cancelCurrentConnection == nil {
+		// Create a child context for a new connection. This allows an individual connection (attempt) to be cancelled without restarting the whole handler
+		ctx, cancel := context.WithCancel(handle.ctx)
 
-	// Only allow one connection change at a time
-	handle.connectionChangeMutex.Lock()
-	defer handle.connectionChangeMutex.Unlock()
+		onReceive := func(data []byte) {
+			handle.broker.TryPub(data, "flex-rx")
+		}
 
-	// disconnect current connection first
-	handle.Disconnect()
+		go listeningLoop(ctx, handle.log, onReceive)
 
-	// Create a child context for a new connection. This allows an individual connection (attempt) to be cancelled without restarting the whole handler
-	ctx, cancel := context.WithCancel(handle.ctx)
-
-	onReceive := func(data []byte) {
-		handle.broker.TryPub(data, "rx")
+		handle.cancelCurrentConnection = cancel
 	}
 
-	go listeningLoop(ctx, handle.log, onReceive)
-
-	handle.cancelCurrentConnection = cancel
+	handle.subscriberCount++
 }
 
-// Disconnect from current connection
-func (handle *Handle) Disconnect() {
-	if handle.cancelCurrentConnection != nil {
+// Deregister subscribers and disconnect when none left
+func (handle *Handle) DeregisterSubscriber() {
+	handle.subscriberCount--
+
+	if handle.subscriberCount == 0 && handle.cancelCurrentConnection != nil {
 		handle.cancelCurrentConnection()
+		handle.cancelCurrentConnection = nil
 	}
 }
 
