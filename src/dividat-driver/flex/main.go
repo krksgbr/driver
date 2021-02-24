@@ -76,18 +76,20 @@ func (handle *Handle) Connect() {
 // Disconnect from current connection
 func (handle *Handle) Disconnect() {
 	if handle.cancelCurrentConnection != nil {
-		handle.log.Info("Disconnecting from serial port.")
 		handle.cancelCurrentConnection()
 	}
 }
 
 // Keep looking for serial devices and connect to them when found, sending signals into the
 // callback.
-func listeningLoop(ctx context.Context, baseLogger *logrus.Entry, onReceive func([]byte)) {
+func listeningLoop(ctx context.Context, logger *logrus.Entry, onReceive func([]byte)) {
 	for {
-		findAndConnectSerial(ctx, baseLogger, onReceive)
+		scanAndConnectSerial(ctx, logger, onReceive)
 
-		// TODO Check whether to die
+		// Terminate if we were cancelled
+		if ctx.Err() != nil {
+			return
+		}
 
 		time.Sleep(2 * time.Second)
 	}
@@ -98,12 +100,12 @@ func listeningLoop(ctx context.Context, baseLogger *logrus.Entry, onReceive func
 //
 // NOTE Portability of serial device detection has not been tested. This is a prototype
 // implementation intended for Linux systems.
-func findAndConnectSerial(ctx context.Context, baseLogger *logrus.Entry, onReceive func([]byte)) {
+func scanAndConnectSerial(ctx context.Context, logger *logrus.Entry, onReceive func([]byte)) {
 	deviceFileFolder := "/dev"
 
 	files, err := ioutil.ReadDir(deviceFileFolder)
 	if err != nil {
-		baseLogger.WithField("error", err).Info("Could not list serial devices.")
+		logger.WithField("error", err).Info("Could not list serial devices.")
 		return
 	}
 
@@ -116,9 +118,12 @@ func findAndConnectSerial(ctx context.Context, baseLogger *logrus.Entry, onRecei
 			continue
 		}
 
-		connectSerial(ctx, baseLogger, path.Join(deviceFileFolder, f.Name()), onReceive)
+		connectSerial(ctx, logger, path.Join(deviceFileFolder, f.Name()), onReceive)
 
-		// TODO check whether to die
+		// Terminate if we were cancelled
+		if ctx.Err() != nil {
+			return
+		}
 	}
 }
 
@@ -141,7 +146,7 @@ const (
 
 // Actually attempt to connect to an individual serial port and pipe its signal into the callback, summarizing
 // package units into a buffer.
-func connectSerial(ctx context.Context, baseLogger *logrus.Entry, serialName string, onReceive func([]byte)) {
+func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string, onReceive func([]byte)) {
 	config := &serial.Config{
 		Name:        serialName,
 		Baud:        460800,
@@ -151,18 +156,18 @@ func connectSerial(ctx context.Context, baseLogger *logrus.Entry, serialName str
 		StopBits:    serial.Stop1,
 	}
 
-	baseLogger.WithField("address", serialName).Info("Attempting to connect with serial port.")
+	logger.WithField("address", serialName).Info("Attempting to connect with serial port.")
 
 	port, err := serial.OpenPort(config)
 	if err != nil {
-		baseLogger.WithField("config", config).WithField("error", err).Info("Failed to open connection to serial port.")
+		logger.WithField("config", config).WithField("error", err).Info("Failed to open connection to serial port.")
 		return
 	}
 	defer port.Close()
 
 	_, err = port.Write([]byte{'S', '\n'})
 	if err != nil {
-		baseLogger.WithField("error", err).Info("Failed to write start message to serial port.")
+		logger.WithField("error", err).Info("Failed to write start message to serial port.")
 		port.Close()
 		return
 	}
@@ -173,7 +178,11 @@ func connectSerial(ctx context.Context, baseLogger *logrus.Entry, serialName str
 
 	var buff []byte
 	for {
-		// TODO Check whether we have been killed before reading next byte
+		// Terminate if we were cancelled
+		if ctx.Err() != nil {
+			logger.WithField("address", serialName).Info("Disconnecting from serial port.")
+			return
+		}
 
 		input, err := reader.ReadByte()
 		if err == io.EOF {
