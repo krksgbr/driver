@@ -89,9 +89,6 @@ func listeningLoop(ctx context.Context, logger *logrus.Entry, onReceive func([]b
 
 // One pass of browsing for serial devices and trying to connect to them turn by turn, first
 // successful connection wins.
-//
-// NOTE Portability of serial device detection has not been tested. This is a prototype
-// implementation intended for Linux systems.
 func scanAndConnectSerial(ctx context.Context, logger *logrus.Entry, onReceive func([]byte)) {
 	deviceFileFolder := "/dev"
 
@@ -111,12 +108,17 @@ func scanAndConnectSerial(ctx context.Context, logger *logrus.Entry, onReceive f
 			continue
 		}
 
-		if !strings.HasPrefix(f.Name(), "ttyACM") {
+		if !hasExpectedName(f.Name()) {
 			continue
 		}
 
 		connectSerial(ctx, logger, path.Join(deviceFileFolder, f.Name()), onReceive)
 	}
+}
+
+func hasExpectedName(filename string) bool {
+	// Device shows up as a USB modem on Linux and macOS
+	return strings.HasPrefix(filename, "ttyACM") || strings.HasPrefix(filename, "cu.usbmodem")
 }
 
 
@@ -144,7 +146,7 @@ const (
 func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string, onReceive func([]byte)) {
 	config := &serial.Config{
 		Name:        serialName,
-		Baud:        921600,
+		Baud:        115200, // ignored by device
 		Size:        8,
 		Parity:      serial.ParityNone,
 		StopBits:    serial.Stop1,
