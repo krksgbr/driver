@@ -1,5 +1,21 @@
 package flex
 
+/* Connects to Senso Flex devices through a serial connection and combines serial data into measurement sets.
+
+This helps establish an indirect WebSocket connection to receive a stream of samples from the device.
+
+The functionality of this module is as follows:
+
+- While connected, scan for serial devices that look like a potential Flex device
+- Connect to suitable serial devices and start polling for measurements
+- Minimally parse incoming data to determine start and end of a measurement
+- Send each complete measurement set to client as a binary package
+
+
+NOTE At the moment this functionality is limited to Linux and macOS systems.
+
+*/
+
 import (
 	"context"
 	"encoding/binary"
