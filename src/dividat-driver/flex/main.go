@@ -2,7 +2,6 @@ package flex
 
 import (
 	"context"
-
 	"encoding/binary"
 	"bufio"
 	"io"
@@ -36,8 +35,6 @@ func New(ctx context.Context, log *logrus.Entry) *Handle {
 		log: log,
 	}
 
-	// PubSub broker
-
 	// Clean up
 	go func() {
 		<-ctx.Done()
@@ -49,8 +46,10 @@ func New(ctx context.Context, log *logrus.Entry) *Handle {
 
 // Connect to device
 func (handle *Handle) Connect() {
+	handle.subscriberCount++
+
+	// If there is no existing connection, create it
 	if handle.cancelCurrentConnection == nil {
-		// Create a child context for a new connection. This allows an individual connection (attempt) to be cancelled without restarting the whole handler
 		ctx, cancel := context.WithCancel(handle.ctx)
 
 		onReceive := func(data []byte) {
@@ -61,8 +60,6 @@ func (handle *Handle) Connect() {
 
 		handle.cancelCurrentConnection = cancel
 	}
-
-	handle.subscriberCount++
 }
 
 // Deregister subscribers and disconnect when none left
@@ -105,6 +102,11 @@ func scanAndConnectSerial(ctx context.Context, logger *logrus.Entry, onReceive f
 	}
 
 	for _, f := range files {
+		// Terminate if we have been cancelled
+		if ctx.Err() != nil {
+			return
+		}
+
 		if f.IsDir() {
 			continue
 		}
@@ -114,11 +116,6 @@ func scanAndConnectSerial(ctx context.Context, logger *logrus.Entry, onReceive f
 		}
 
 		connectSerial(ctx, logger, path.Join(deviceFileFolder, f.Name()), onReceive)
-
-		// Terminate if we were cancelled
-		if ctx.Err() != nil {
-			return
-		}
 	}
 }
 
@@ -190,12 +187,15 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 			continue
 		}
 
+		// Finite State Machine for parsing byte stream
 		switch {
 		case state == WAITING_FOR_HEADER && input == HEADER_START_MARKER:
 			state = HEADER_START
 		case state == HEADER_START && input == '\n':
 			state = HEADER_READ_LENGTH_MSB
                 case state == HEADER_READ_LENGTH_MSB:
+			// The number of measurements in each set may vary and is
+			// given as two consecutive bytes (big-endian).
 			msb := input
 			lsb, err := reader.ReadByte()
 			if err == io.EOF {
@@ -220,9 +220,9 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 				if pointsLeftInSet <= 0 {
 					// Finish and send set
 					onReceive(buff)
-					buff = []byte{}
 
 					// Get ready for next set and request it
+					buff = []byte{}
 					state = WAITING_FOR_HEADER
 					_, err = port.Write(START_MEASUREMENT_CMD)
 					if err != nil {
