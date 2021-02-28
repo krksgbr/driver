@@ -1,6 +1,6 @@
 with (import ./nix/nixpkgs.nix) {};
 
-buildGoPackage rec {
+buildGo112Package rec {
     name = "dividat-driver";
     goPackagePath = "dividat-driver";
 
@@ -10,7 +10,7 @@ buildGoPackage rec {
 
     buildInputs =
     [ 
-        go_1_9
+        go_1_12
         dep
         # Git is a de facto dependency of dep
         git

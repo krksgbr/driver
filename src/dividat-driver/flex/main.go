@@ -11,9 +11,6 @@ The functionality of this module is as follows:
 - Minimally parse incoming data to determine start and end of a measurement
 - Send each complete measurement set to client as a binary package
 
-
-NOTE At the moment this functionality is limited to Linux and macOS systems.
-
 */
 
 import (
@@ -21,14 +18,13 @@ import (
 	"encoding/binary"
 	"bufio"
 	"io"
-	"io/ioutil"
-	"path"
 	"strings"
 	"time"
 
 	"github.com/cskr/pubsub"
 	"github.com/sirupsen/logrus"
-	"github.com/tarm/serial"
+	"go.bug.st/serial"
+	"go.bug.st/serial/enumerator"
 )
 
 // Handle for managing SensingTex connection
@@ -106,35 +102,34 @@ func listeningLoop(ctx context.Context, logger *logrus.Entry, onReceive func([]b
 // One pass of browsing for serial devices and trying to connect to them turn by turn, first
 // successful connection wins.
 func scanAndConnectSerial(ctx context.Context, logger *logrus.Entry, onReceive func([]byte)) {
-	deviceFileFolder := "/dev"
-
-	files, err := ioutil.ReadDir(deviceFileFolder)
+	ports, err := enumerator.GetDetailedPortsList()
 	if err != nil {
 		logger.WithField("error", err).Info("Could not list serial devices.")
 		return
 	}
 
-	for _, f := range files {
+	for _, port := range ports {
 		// Terminate if we have been cancelled
 		if ctx.Err() != nil {
 			return
 		}
 
-		if f.IsDir() {
-			continue
-		}
+		logger.WithField("name", port.Name).WithField("vendor", port.VID).Debug("Considering serial port.")
 
-		if !hasExpectedName(f.Name()) {
-			continue
+		if isFlexLike(port) {
+			connectSerial(ctx, logger, port.Name, onReceive)
 		}
-
-		connectSerial(ctx, logger, path.Join(deviceFileFolder, f.Name()), onReceive)
 	}
 }
 
-func hasExpectedName(filename string) bool {
-	// Device shows up as a USB modem on Linux and macOS
-	return strings.HasPrefix(filename, "ttyACM") || strings.HasPrefix(filename, "cu.usbmodem")
+// Check whether a port looks like a potential Flex device.
+//
+// Vendor IDs:
+//   16C0 - Van Ooijen Technische Informatica (Teensy)
+func isFlexLike(port *enumerator.PortDetails) bool {
+	vendorId := strings.ToUpper(port.VID)
+
+	return vendorId == "16C0"
 }
 
 
@@ -160,20 +155,19 @@ const (
 // Actually attempt to connect to an individual serial port and pipe its signal into the callback, summarizing
 // package units into a buffer.
 func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string, onReceive func([]byte)) {
-	config := &serial.Config{
-		Name:        serialName,
-		Baud:        115200, // ignored by device
-		Size:        8,
-		Parity:      serial.ParityNone,
-		StopBits:    serial.Stop1,
+	mode := &serial.Mode{
+		BaudRate: 115200,
+		Parity:   serial.NoParity,
+		DataBits: 8,
+		StopBits: serial.OneStopBit,
 	}
 
 	START_MEASUREMENT_CMD := []byte{'S', '\n'}
 
-	logger.WithField("address", serialName).Info("Attempting to connect with serial port.")
-	port, err := serial.OpenPort(config)
+	logger.WithField("name", serialName).Info("Attempting to connect with serial port.")
+	port, err := serial.Open(serialName, mode)
 	if err != nil {
-		logger.WithField("config", config).WithField("error", err).Info("Failed to open connection to serial port.")
+		logger.WithField("config", mode).WithField("error", err).Info("Failed to open connection to serial port.")
 		return
 	}
 	defer port.Close()
@@ -194,7 +188,7 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 	for {
 		// Terminate if we were cancelled
 		if ctx.Err() != nil {
-			logger.WithField("address", serialName).Info("Disconnecting from serial port.")
+			logger.WithField("name", serialName).Info("Disconnecting from serial port.")
 			return
 		}
 
