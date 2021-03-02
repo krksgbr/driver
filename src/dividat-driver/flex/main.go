@@ -170,12 +170,14 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 		logger.WithField("config", mode).WithField("error", err).Info("Failed to open connection to serial port.")
 		return
 	}
-	defer port.Close()
+	defer func() {
+		logger.WithField("name", serialName).Info("Disconnecting from serial port.")
+		port.Close()
+	}()
 
 	_, err = port.Write(START_MEASUREMENT_CMD)
 	if err != nil {
 		logger.WithField("error", err).Info("Failed to write start message to serial port.")
-		port.Close()
 		return
 	}
 
@@ -188,7 +190,6 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 	for {
 		// Terminate if we were cancelled
 		if ctx.Err() != nil {
-			logger.WithField("name", serialName).Info("Disconnecting from serial port.")
 			return
 		}
 
@@ -239,7 +240,6 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 					_, err = port.Write(START_MEASUREMENT_CMD)
 					if err != nil {
 						logger.WithField("error", err).Info("Failed to write poll message to serial port.")
-						port.Close()
 						return
 					}
 				} else {
