@@ -143,7 +143,7 @@ const (
 	HEADER_READ_LENGTH_MSB
 	WAITING_FOR_BODY
 	BODY_START
-	BODY_POINT
+	BODY_READ_SAMPLE
 	UNEXPECTED_BYTE
 )
 
@@ -181,8 +181,8 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 
 	reader := bufio.NewReader(port)
 	state := WAITING_FOR_HEADER
-	pointsLeftInSet := 0
-	bytesLeftInPoint := 0
+	samplesLeftInSet := 0
+	bytesLeftInSample := 0
 
 	var buff []byte
 	for {
@@ -215,21 +215,21 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 			} else if err != nil {
 				continue
 			}
-			pointsLeftInSet = int(binary.BigEndian.Uint16([]byte{msb,lsb}))
+			samplesLeftInSet = int(binary.BigEndian.Uint16([]byte{msb,lsb}))
 			state = WAITING_FOR_BODY
 		case state == WAITING_FOR_BODY && input == BODY_START_MARKER:
 			state = BODY_START
 		case state == BODY_START && input == '\n':
-			state = BODY_POINT
-			bytesLeftInPoint = 4
-                case state == BODY_POINT:
+			state = BODY_READ_SAMPLE
+			bytesLeftInSample = 4
+                case state == BODY_READ_SAMPLE:
 			buff = append(buff, input)
-			bytesLeftInPoint = bytesLeftInPoint - 1
+			bytesLeftInSample = bytesLeftInSample - 1
 
-			if bytesLeftInPoint <= 0 {
-				pointsLeftInSet = pointsLeftInSet - 1
+			if bytesLeftInSample <= 0 {
+				samplesLeftInSet = samplesLeftInSet - 1
 
-				if pointsLeftInSet <= 0 {
+				if samplesLeftInSet <= 0 {
 					// Finish and send set
 					onReceive(buff)
 
@@ -244,14 +244,14 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 					}
 				} else {
 					// Start next point
-					bytesLeftInPoint = 4
+					bytesLeftInSample = 4
 				}
 			}
 		case state == UNEXPECTED_BYTE && input == HEADER_START_MARKER:
 			// Recover from error state when a new header is seen
 			buff = []byte{}
-			bytesLeftInPoint = 0
-			pointsLeftInSet = 0
+			bytesLeftInSample = 0
+			samplesLeftInSet = 0
 			state = HEADER_START
 		default:
 			state = UNEXPECTED_BYTE
