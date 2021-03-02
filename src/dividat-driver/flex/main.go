@@ -150,6 +150,7 @@ const (
 const (
 	HEADER_START_MARKER = 'N'
 	BODY_START_MARKER = 'P'
+	BYTES_PER_SAMPLE = 4
 )
 
 // Actually attempt to connect to an individual serial port and pipe its signal into the callback, summarizing
@@ -222,7 +223,7 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 			state = BODY_START
 		case state == BODY_START && input == '\n':
 			state = BODY_READ_SAMPLE
-			bytesLeftInSample = 4
+			bytesLeftInSample = BYTES_PER_SAMPLE
                 case state == BODY_READ_SAMPLE:
 			buff = append(buff, input)
 			bytesLeftInSample = bytesLeftInSample - 1
@@ -244,7 +245,7 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 					}
 				} else {
 					// Start next point
-					bytesLeftInSample = 4
+					bytesLeftInSample = BYTES_PER_SAMPLE
 				}
 			}
 		case state == UNEXPECTED_BYTE && input == HEADER_START_MARKER:
