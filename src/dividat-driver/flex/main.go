@@ -17,7 +17,6 @@ import (
 	"context"
 	"encoding/binary"
 	"bufio"
-	"io"
 	"strings"
 	"time"
 
@@ -195,10 +194,8 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 		}
 
 		input, err := reader.ReadByte()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			continue
+		if err != nil {
+			return
 		}
 
 		// Finite State Machine for parsing byte stream
@@ -212,10 +209,8 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 			// given as two consecutive bytes (big-endian).
 			msb := input
 			lsb, err := reader.ReadByte()
-			if err == io.EOF {
-				break
-			} else if err != nil {
-				continue
+			if err != nil {
+				return
 			}
 			samplesLeftInSet = int(binary.BigEndian.Uint16([]byte{msb,lsb}))
 			state = WAITING_FOR_BODY
