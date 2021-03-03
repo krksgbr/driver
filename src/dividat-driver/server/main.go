@@ -10,6 +10,7 @@ import (
 	"dividat-driver/logging"
 	"dividat-driver/rfid"
 	"dividat-driver/senso"
+	"dividat-driver/flex"
 	"dividat-driver/update"
 )
 
@@ -57,6 +58,10 @@ func Start(logger *logrus.Logger) context.CancelFunc {
 	// Setup Senso
 	sensoHandle := senso.New(ctx, baseLog.WithField("package", "senso"))
 	http.Handle("/senso", sensoHandle)
+
+	// Setup SensingTex reader
+	flexHandle := flex.New(ctx, baseLog.WithField("package", "flex"))
+	http.Handle("/flex", flexHandle)
 
 	// Setup RFID scanner
 	rfidHandle := rfid.NewHandle(ctx, baseLog.WithField("package", "rfid"))
