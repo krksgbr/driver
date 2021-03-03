@@ -182,8 +182,8 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 
 	reader := bufio.NewReader(port)
 	state := WAITING_FOR_HEADER
-	samplesLeftInSet := 0
-	bytesLeftInSample := 0
+	var samplesLeftInSet int
+	var bytesLeftInSample int
 
 	var buff []byte
 	for {
@@ -217,6 +217,7 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 			state = BODY_START
 		case state == BODY_START && input == '\n':
 			state = BODY_READ_SAMPLE
+			buff = []byte{}
 			bytesLeftInSample = BYTES_PER_SAMPLE
 		case state == BODY_READ_SAMPLE:
 			buff = append(buff, input)
@@ -230,7 +231,6 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 					onReceive(buff)
 
 					// Get ready for next set and request it
-					buff = []byte{}
 					state = WAITING_FOR_HEADER
 					_, err = port.Write(START_MEASUREMENT_CMD)
 					if err != nil {
@@ -244,9 +244,6 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 			}
 		case state == UNEXPECTED_BYTE && input == HEADER_START_MARKER:
 			// Recover from error state when a new header is seen
-			buff = []byte{}
-			bytesLeftInSample = 0
-			samplesLeftInSet = 0
 			state = HEADER_START
 		default:
 			state = UNEXPECTED_BYTE
