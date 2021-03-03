@@ -14,9 +14,9 @@ The functionality of this module is as follows:
 */
 
 import (
+	"bufio"
 	"context"
 	"encoding/binary"
-	"bufio"
 	"strings"
 	"time"
 
@@ -33,7 +33,7 @@ type Handle struct {
 	ctx context.Context
 
 	cancelCurrentConnection context.CancelFunc
-	subscriberCount int
+	subscriberCount         int
 
 	log *logrus.Entry
 }
@@ -42,8 +42,8 @@ type Handle struct {
 func New(ctx context.Context, log *logrus.Entry) *Handle {
 	handle := Handle{
 		broker: pubsub.New(32),
-		ctx: ctx,
-		log: log,
+		ctx:    ctx,
+		log:    log,
 	}
 
 	// Clean up
@@ -131,7 +131,6 @@ func isFlexLike(port *enumerator.PortDetails) bool {
 	return vendorId == "16C0"
 }
 
-
 // Serial communication
 
 type ReaderState int
@@ -148,8 +147,8 @@ const (
 
 const (
 	HEADER_START_MARKER = 'N'
-	BODY_START_MARKER = 'P'
-	BYTES_PER_SAMPLE = 4
+	BODY_START_MARKER   = 'P'
+	BYTES_PER_SAMPLE    = 4
 )
 
 // Actually attempt to connect to an individual serial port and pipe its signal into the callback, summarizing
@@ -204,7 +203,7 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 			state = HEADER_START
 		case state == HEADER_START && input == '\n':
 			state = HEADER_READ_LENGTH_MSB
-                case state == HEADER_READ_LENGTH_MSB:
+		case state == HEADER_READ_LENGTH_MSB:
 			// The number of measurements in each set may vary and is
 			// given as two consecutive bytes (big-endian).
 			msb := input
@@ -212,14 +211,14 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 			if err != nil {
 				return
 			}
-			samplesLeftInSet = int(binary.BigEndian.Uint16([]byte{msb,lsb}))
+			samplesLeftInSet = int(binary.BigEndian.Uint16([]byte{msb, lsb}))
 			state = WAITING_FOR_BODY
 		case state == WAITING_FOR_BODY && input == BODY_START_MARKER:
 			state = BODY_START
 		case state == BODY_START && input == '\n':
 			state = BODY_READ_SAMPLE
 			bytesLeftInSample = BYTES_PER_SAMPLE
-                case state == BODY_READ_SAMPLE:
+		case state == BODY_READ_SAMPLE:
 			buff = append(buff, input)
 			bytesLeftInSample = bytesLeftInSample - 1
 
