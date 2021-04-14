@@ -8,10 +8,9 @@ import (
 	"log"
 	"os"
 
-	"dividat-driver/logging"
-	"dividat-driver/server"
-	"dividat-driver/firmware"
-
+	"github.com/dividat/driver/src/dividat-driver/firmware"
+	"github.com/dividat/driver/src/dividat-driver/logging"
+	"github.com/dividat/driver/src/dividat-driver/server"
 	"github.com/kardianos/service"
 	"github.com/sirupsen/logrus"
 )
