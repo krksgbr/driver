@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add a new bridge for Senso Flex devices
 - Tool to record data from Senso
 - Command-line interface to update firmware on Senso via Ethernet
 
