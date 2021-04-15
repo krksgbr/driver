@@ -162,5 +162,4 @@ nix/deps.nix: src/dividat-driver/Gopkg.toml
 clean:
 	rm -rf release/
 	rm -rf bin/
-	rm -rf src/dividat-driver/vendor/
-	go clean
+	go clean src/dividat-driver/main.go
