@@ -31,7 +31,10 @@ ifdef STATIC_BUILD
 	STATIC_LINKING_LDFLAGS := -linkmode external -extldflags \"-static\"
 endif
 
-GO_LDFLAGS = -ldflags "$(STATIC_LINKING_LDFLAGS) -X dividat-driver/server.channel=$(CHANNEL) -X dividat-driver/server.version=$(VERSION) -X dividat-driver/update.releaseUrl=$(RELEASE_URL)"
+GO_LDFLAGS = -ldflags "$(STATIC_LINKING_LDFLAGS) \
+						 -X github.com/dividat/driver/src/dividat-driver/server.channel=$(CHANNEL) \
+						 -X github.com/dividat/driver/src/dividat-driver/server.version=$(VERSION) \
+						 -X github.com/dividat/driver/src/dividat-driver/update.releaseUrl=$(RELEASE_URL)"
 
 CODE_SIGNING_CERT ?= ./keys/codesign.p12
 CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
