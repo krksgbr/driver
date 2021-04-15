@@ -30,7 +30,7 @@ mkShell {
   # This seems to be fixed with nixpkgs 20.03
   # https://github.com/NixOS/nixpkgs/issues/90136
   shellHook = ''
-    export GOPATH=""
+    export GOPATH="$HOME/.go"
   '';
 
 }
