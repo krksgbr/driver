@@ -20,13 +20,11 @@ Dividat drivers and hardware test suites.
 
 Run the test suite with: `make test`.
 
-### Go packages
+### Go modules
 
-Go dependencies are provided by the [Go machinery](https://nixos.org/nixpkgs/manual/#sec-language-go) in Nix.
+To install a module, use `go get github.com/owner/repo`.
 
-For local development you may use `dep` to install go dependencies: `cd src/dividat-driver && dep ensure`.
-
-New Go dependencies can be added with `dep` (e.g. `dep ensure -add github.com/something/supercool`). The Nix specification of dependencies will recreated on subsequent builds (i.e. running `make`). Check in the updated `Gopkg.toml`, `Gopkg.lock` and `nix/deps.nix` files.
+Documentation is available at https://golang.org/ref/mod.
 
 ### Releasing
 

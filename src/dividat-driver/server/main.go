@@ -7,11 +7,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"dividat-driver/logging"
-	"dividat-driver/rfid"
-	"dividat-driver/senso"
-	"dividat-driver/flex"
-	"dividat-driver/update"
+	"github.com/dividat/driver/src/dividat-driver/flex"
+	"github.com/dividat/driver/src/dividat-driver/logging"
+	"github.com/dividat/driver/src/dividat-driver/rfid"
+	"github.com/dividat/driver/src/dividat-driver/senso"
+	"github.com/dividat/driver/src/dividat-driver/update"
 )
 
 // Uncomment following line for profiling. And run `go tool pprof http://localhost:8382/debug/pprof/profile` or `go tool pprof http://localhost:8382/debug/pprof/heap`
