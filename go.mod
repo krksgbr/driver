@@ -14,6 +14,5 @@ require (
 	github.com/kardianos/service v1.2.0
 	github.com/pin/tftp v2.1.0+incompatible
 	github.com/sirupsen/logrus v1.8.1
-	github.com/streadway/amqp v1.0.0
 	go.bug.st/serial v1.1.3
 )

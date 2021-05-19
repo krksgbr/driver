@@ -30,9 +30,6 @@ func Start(logger *logrus.Logger) context.CancelFunc {
 	logger.AddHook(logServer)
 	http.Handle("/log", logServer)
 
-	// AMQP Log delivery
-	logger.AddHook(logging.NewAMQPHook())
-
 	baseLog := logger.WithFields(logrus.Fields{
 		"version":        version,
 		"releaseChannel": channel,

@@ -8,6 +8,10 @@
 - Tool to record data from Senso
 - Command-line interface to update firmware on Senso via Ethernet
 
+### Removed
+
+- Remove centralized log sink
+
 ## [2.1.0] - 2018-09-18
 
 ### Changed
