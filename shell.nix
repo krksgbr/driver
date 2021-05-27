@@ -14,9 +14,6 @@ mkShell {
     # for building releases
     openssl upx
 
-    # for signing windows releases
-    (import ./nix/osslsigncode {inherit stdenv fetchurl openssl curl autoconf;})
-
     # for deployment to S3
     awscli
 
