@@ -36,7 +36,6 @@ GO_LDFLAGS = -ldflags "$(STATIC_LINKING_LDFLAGS) \
 						 -X github.com/dividat/driver/src/dividat-driver/server.version=$(VERSION) \
 						 -X github.com/dividat/driver/src/dividat-driver/update.releaseUrl=$(RELEASE_URL)"
 
-CODE_SIGNING_CERT ?= ./keys/codesign.p12
 CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 
 
@@ -97,31 +96,25 @@ $(LATEST):
 	$(call write-signature,$@)
 
 LINUX_RELEASE = $(RELEASE_DIR)/$(notdir $(LINUX_BIN))-$(VERSION)
-$(LINUX_RELEASE): $(LINUX_BIN)
-	mkdir -p $(RELEASE_DIR)
+$(LINUX_RELEASE): $(RELEASE_DIR) $(LINUX_BIN)
 	cp $(LINUX_BIN) $(LINUX_RELEASE)
 	upx $(LINUX_RELEASE)
 	$(call write-signature,$(LINUX_RELEASE))
 
 #DARWIN_RELEASE = $(RELEASE_DIR)/$(notdir $(DARWIN_BIN))-$(VERSION)
-#$(DARWIN_RELEASE): $(DARWIN_BIN)
+#$(DARWIN_RELEASE): $(RELEASE_DIR) $(DARWIN_BIN)
 	#cp bin/$(DARWIN_BIN) $(DARWIN_RELEASE)
 	#upx $(DARWIN_RELEASE)
 	#$ (call write-signature,$(DARWIN_RELEASE))
 
 WINDOWS_RELEASE = $(RELEASE_DIR)/dividat-driver-windows-amd64-$(VERSION).exe
-$(WINDOWS_RELEASE): $(WINDOWS_BIN)
+$(WINDOWS_RELEASE): $(RELEASE_DIR) $(WINDOWS_BIN)
 	cp $(WINDOWS_BIN) $(WINDOWS_RELEASE)
-	upx $(WINDOWS_BIN)
-	osslsigncode sign \
-		-pkcs12 $(CODE_SIGNING_CERT) \
-		-h sha1 \
-		-n "Dividat Driver" \
-		-i "https://www.dividat.com/" \
-		-t http://timestamp.verisign.com/scripts/timstamp.dll \
-		-in $(WINDOWS_BIN) \
-		-out $(WINDOWS_RELEASE)
+	upx $(WINDOWS_RELEASE)
 	$(call write-signature,$(WINDOWS_RELEASE))
+
+$(RELEASE_DIR):
+	mkdir -p $(RELEASE_DIR)
 
 # sign and copy binaries to release folders
 .PHONY: release
