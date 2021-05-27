@@ -2,7 +2,7 @@
 
 ## Configuration ##########################################
 $releaseUrl = "https://dist.dividat.com/releases/driver2/"
-$channel = "master"
+$channel = "main"
 $installDir = "C:\Program Files\dividat-driver"
 ###########################################################
 
