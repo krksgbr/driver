@@ -12,6 +12,7 @@
 
 - Remove centralized log sink
 - Windows builds are no longer code-signed as there is no official Windows support
+- Remove self-update functionality
 
 ## [2.1.0] - 2018-09-18
 

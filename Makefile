@@ -33,8 +33,7 @@ endif
 
 GO_LDFLAGS = -ldflags "$(STATIC_LINKING_LDFLAGS) \
 						 -X github.com/dividat/driver/src/dividat-driver/server.channel=$(CHANNEL) \
-						 -X github.com/dividat/driver/src/dividat-driver/server.version=$(VERSION) \
-						 -X github.com/dividat/driver/src/dividat-driver/update.releaseUrl=$(RELEASE_URL)"
+						 -X github.com/dividat/driver/src/dividat-driver/server.version=$(VERSION)"
 
 CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 

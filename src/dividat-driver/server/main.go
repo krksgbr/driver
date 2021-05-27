@@ -11,7 +11,6 @@ import (
 	"github.com/dividat/driver/src/dividat-driver/logging"
 	"github.com/dividat/driver/src/dividat-driver/rfid"
 	"github.com/dividat/driver/src/dividat-driver/senso"
-	"github.com/dividat/driver/src/dividat-driver/update"
 )
 
 // Uncomment following line for profiling. And run `go tool pprof http://localhost:8382/debug/pprof/profile` or `go tool pprof http://localhost:8382/debug/pprof/heap`
@@ -71,9 +70,6 @@ func Start(logger *logrus.Logger) context.CancelFunc {
 
 	// Start the monitor
 	go startMonitor(baseLog.WithField("package", "monitor"))
-
-	// Setup driver update loop
-	go update.Start(baseLog.WithField("package", "update"), version, channel)
 
 	// Setup HTTP Server
 	server := http.Server{Addr: "127.0.0.1:" + serverPort}
