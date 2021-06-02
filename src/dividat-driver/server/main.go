@@ -18,7 +18,6 @@ import (
 
 // build var (-ldflags)
 var version string
-var channel string
 
 const serverPort = "8382"
 
@@ -31,7 +30,6 @@ func Start(logger *logrus.Logger) context.CancelFunc {
 
 	baseLog := logger.WithFields(logrus.Fields{
 		"version":        version,
-		"releaseChannel": channel,
 	})
 
 	// Get System information
@@ -77,7 +75,6 @@ func Start(logger *logrus.Logger) context.CancelFunc {
 	// Server root
 	rootMsg, _ := json.Marshal(map[string]string{
 		"message":   "Dividat Driver",
-		"channel":   channel,
 		"version":   version,
 		"machineId": systemInfo.MachineId,
 		"os":        systemInfo.Os,
