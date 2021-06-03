@@ -20,8 +20,8 @@ OUT ?= bin/dividat-driver
 # Get version from git
 VERSION := $(shell git describe --always HEAD)
 
-# set the channel name to the branch name
-CHANNEL := $(shell git rev-parse --abbrev-ref HEAD)
+# Only channel is main now
+CHANNEL := main
 
 CC ?= gcc
 CXX ?= g++
@@ -32,9 +32,7 @@ ifdef STATIC_BUILD
 endif
 
 GO_LDFLAGS = -ldflags "$(STATIC_LINKING_LDFLAGS) \
-						 -X github.com/dividat/driver/src/dividat-driver/server.channel=$(CHANNEL) \
-						 -X github.com/dividat/driver/src/dividat-driver/server.version=$(VERSION) \
-						 -X github.com/dividat/driver/src/dividat-driver/update.releaseUrl=$(RELEASE_URL)"
+						 -X github.com/dividat/driver/src/dividat-driver/server.version=$(VERSION)"
 
 CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 
@@ -126,17 +124,12 @@ release: $(LINUX_RELEASE) $(WINDOWS_RELEASE) release/$(CHANNEL)/latest
 SEMVER_REGEX = ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$
 
 deploy: release
-	# Check if on right channel
-	[[ $(CHANNEL) = "master" || $(CHANNEL) = "develop" ]]
-
 	# Check if version is in semver format
 	[[ $(VERSION) =~ $(SEMVER_REGEX) ]]
 
 	# Print information about channel heads and confirm
-	@echo "Channel 'master' is at:"
-	@echo "  $(shell git show --oneline --decorate --quiet $$(curl -s "$(RELEASE_URL)master/latest" | tr -d '\n') | tail -1)"
-	@echo "Channel 'develop' is at:"
-	@echo "  $(shell git show --oneline --decorate --quiet $$(curl -s "$(RELEASE_URL)develop/latest" | tr -d '\n') | tail -1)"
+	@echo "Channel '$(CHANNEL)' is at:"
+	@echo "  $(shell git show --oneline --decorate --quiet $$(curl -s "$(RELEASE_URL)$(CHANNEL)/latest" | tr -d '\n') | tail -1)"
 	@echo
 	@echo "About to deploy $(VERSION) to '$(CHANNEL)'. Proceed? [y/N]" && read ans && [ $${ans:-N} == y ]
 
