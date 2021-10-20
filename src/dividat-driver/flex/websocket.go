@@ -81,14 +81,16 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		defer close()
 		for {
 
-			_, _, err := conn.ReadMessage()
+			messageType, msg, err := conn.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
 					log.WithError(err).Error("WebSocket error")
 				}
 				return
 			}
-
+			if messageType == websocket.BinaryMessage {
+				handle.broker.TryPub(msg, "flex-tx")
+			}
 		}
 	}()
 

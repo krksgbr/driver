@@ -67,7 +67,7 @@ func (handle *Handle) Connect() {
 			handle.broker.TryPub(data, "flex-rx")
 		}
 
-		go listeningLoop(ctx, handle.log, onReceive)
+		go listeningLoop(ctx, handle.log, handle.broker.Sub("flex-tx"), onReceive)
 
 		handle.cancelCurrentConnection = cancel
 	}
@@ -85,9 +85,9 @@ func (handle *Handle) DeregisterSubscriber() {
 
 // Keep looking for serial devices and connect to them when found, sending signals into the
 // callback.
-func listeningLoop(ctx context.Context, logger *logrus.Entry, onReceive func([]byte)) {
+func listeningLoop(ctx context.Context, logger *logrus.Entry, tx chan interface{}, onReceive func([]byte)) {
 	for {
-		scanAndConnectSerial(ctx, logger, onReceive)
+		scanAndConnectSerial(ctx, logger, tx, onReceive)
 
 		// Terminate if we were cancelled
 		if ctx.Err() != nil {
@@ -100,7 +100,7 @@ func listeningLoop(ctx context.Context, logger *logrus.Entry, onReceive func([]b
 
 // One pass of browsing for serial devices and trying to connect to them turn by turn, first
 // successful connection wins.
-func scanAndConnectSerial(ctx context.Context, logger *logrus.Entry, onReceive func([]byte)) {
+func scanAndConnectSerial(ctx context.Context, logger *logrus.Entry, tx chan interface{}, onReceive func([]byte)) {
 	ports, err := enumerator.GetDetailedPortsList()
 	if err != nil {
 		logger.WithField("error", err).Info("Could not list serial devices.")
@@ -116,7 +116,7 @@ func scanAndConnectSerial(ctx context.Context, logger *logrus.Entry, onReceive f
 		logger.WithField("name", port.Name).WithField("vendor", port.VID).Debug("Considering serial port.")
 
 		if isFlexLike(port) {
-			connectSerial(ctx, logger, port.Name, onReceive)
+			connectSerial(ctx, logger, port.Name, tx, onReceive)
 		}
 	}
 }
@@ -148,12 +148,12 @@ const (
 const (
 	HEADER_START_MARKER = 'N'
 	BODY_START_MARKER   = 'P'
-	BYTES_PER_SAMPLE    = 4
+	BYTES_PER_SAMPLE    = 3
 )
 
 // Actually attempt to connect to an individual serial port and pipe its signal into the callback, summarizing
 // package units into a buffer.
-func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string, onReceive func([]byte)) {
+func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string, tx chan interface{}, onReceive func([]byte)) {
 	mode := &serial.Mode{
 		BaudRate: 115200,
 		Parity:   serial.NoParity,
@@ -169,9 +169,11 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 		logger.WithField("config", mode).WithField("error", err).Info("Failed to open connection to serial port.")
 		return
 	}
+	portCtx, portCtxCancel := context.WithCancel(ctx)
 	defer func() {
 		logger.WithField("name", serialName).Info("Disconnecting from serial port.")
 		port.Close()
+		portCtxCancel()
 	}()
 
 	_, err = port.Write(START_MEASUREMENT_CMD)
@@ -185,6 +187,23 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 	var samplesLeftInSet int
 	var bytesLeftInSample int
 
+	// Spawn routine to forward WebSocket commands to device
+	go func() {
+		for {
+			select {
+
+			case <-portCtx.Done():
+				return
+
+			case i := <-tx:
+				data, _ := i.([]byte)
+				_, err = port.Write(data)
+				logger.WithField("bytes", data).Debug("Wrote binary command to serial out.")
+			}
+		}
+	}()
+
+	// Start signal acquisition
 	var buff []byte
 	for {
 		// Terminate if we were cancelled
