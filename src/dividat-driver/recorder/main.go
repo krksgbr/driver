@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"os/signal"
@@ -15,11 +16,11 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	u := url.URL{Scheme: "ws", Host: "localhost:8382", Path: "/senso"}
+	u := parseUrl()
 
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Could not record from '%s': %s", u.String(), err)
 	}
 	defer c.Close()
 
@@ -56,4 +57,15 @@ func main() {
 			return
 		}
 	}
+}
+
+func parseUrl() url.URL {
+	if (len(os.Args) < 2) {
+		log.Fatal("Expected the WebSocket URL to record from as a parameter")
+	}
+	u, err := url.Parse(os.Args[1])
+	if err != nil {
+		log.Fatalf("Malformed WebSocket URL: %s", err)
+	}
+	return *u
 }

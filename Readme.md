@@ -71,7 +71,13 @@ To be able to connect to the driver from within a web app delivered over HTTPS, 
 
 ### Data recorder
 
+#### Senso data
+
 Data from Senso can be recorded using the [`recorder`](src/dividat-driver/recorder). Start it with `make record > foo.dat`. The created recording can be used by the replayer.
+
+#### Senso Flex data
+
+Like Senso data, but with `make record-flex`.
 
 ### Data replayer
 
@@ -84,3 +90,11 @@ To replay an other recording: `npm run replay -- rec/simple.dat`
 To change the replay speed: `npm run replay -- --speed=0.5 rec/simple.dat`
 
 To run without looping: `npm run replay -- --once`
+
+#### Senso replay
+
+The Senso replayer will appear as a Senso network device, so both driver and replayer should be running at the same time.
+
+#### Senso Flex replay
+
+The Senso Flex replayer (`npm run replay-flex`) supports the same parameters as the Senso replayer. It mocks the driver with respect to the `/flex` WebSocket resource, so the driver can not be running at the same time.

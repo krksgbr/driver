@@ -58,8 +58,12 @@ run: build
 ### Helper to start the recorder
 .PHONY: record
 record:
-	@go run src/dividat-driver/recorder/main.go
+	@go run src/dividat-driver/recorder/main.go ws://localhost:8382/senso
 
+### Helper to start the recorder for Flex
+.PHONY: record-flex
+record-flex:
+	@go run src/dividat-driver/recorder/main.go ws://localhost:8382/flex
 
 ### Cross compilation #####################################
 LINUX_BIN = bin/dividat-driver-linux-amd64
