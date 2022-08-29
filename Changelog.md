@@ -8,6 +8,10 @@
 - Tool to record data from Senso
 - Command-line interface to update firmware on Senso via Ethernet
 
+### Changed
+
+- Limit permissible CORS origins
+
 ### Removed
 
 - Remove centralized log sink

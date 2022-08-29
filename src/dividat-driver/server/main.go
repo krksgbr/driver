@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"regexp"
 
 	"github.com/sirupsen/logrus"
 
@@ -26,7 +27,7 @@ func Start(logger *logrus.Logger) context.CancelFunc {
 	// Log Server
 	logServer := logging.NewLogServer()
 	logger.AddHook(logServer)
-	http.Handle("/log", logServer)
+	http.Handle("/log", corsHeaders(logServer))
 
 	baseLog := logger.WithFields(logrus.Fields{
 		"version":        version,
@@ -51,17 +52,17 @@ func Start(logger *logrus.Logger) context.CancelFunc {
 
 	// Setup Senso
 	sensoHandle := senso.New(ctx, baseLog.WithField("package", "senso"))
-	http.Handle("/senso", sensoHandle)
+	http.Handle("/senso", corsHeaders(sensoHandle))
 
 	// Setup SensingTex reader
 	flexHandle := flex.New(ctx, baseLog.WithField("package", "flex"))
-	http.Handle("/flex", flexHandle)
+	http.Handle("/flex", corsHeaders(flexHandle))
 
 	// Setup RFID scanner
 	rfidHandle := rfid.NewHandle(ctx, baseLog.WithField("package", "rfid"))
 	// net/http performs a redirect from `/rfid` if only `/rfid/` is mounted
-	http.Handle("/rfid", rfidHandle)
-	http.Handle("/rfid/", rfidHandle)
+	http.Handle("/rfid", corsHeaders(rfidHandle))
+	http.Handle("/rfid/", corsHeaders(rfidHandle))
 
 	// Create a logger for server
 	log := baseLog.WithField("package", "server")
@@ -80,11 +81,10 @@ func Start(logger *logrus.Logger) context.CancelFunc {
 		"os":        systemInfo.Os,
 		"arch":      systemInfo.Arch,
 	})
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+	http.Handle("/", corsHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(rootMsg)
-	})
+	})))
 
 	// Start the server
 	log.WithField("port", serverPort).Info("Starting HTTP server.")
@@ -106,4 +106,25 @@ func Start(logger *logrus.Logger) context.CancelFunc {
 	}()
 
 	return cancel
+}
+
+// Middleware for CORS headers, to be applied to any route that should be accessible from browser apps.
+func corsHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if len(r.Header["Origin"]) == 1 && isPermissibleOrigin(r.Header["Origin"][0]) {
+			w.Header().Set("Access-Control-Allow-Origin", r.Header["Origin"][0])
+		}
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(200)
+			return
+		} else {
+			next.ServeHTTP(w, r)
+		}
+	})
+}
+
+func isPermissibleOrigin(origin string) bool {
+	isMatch, err := regexp.MatchString("\\A(http://(127\\.0\\.0\\.1|localhost)(:\\d+)?|https://(.*\\.)?dividat\\.(com|ch))\\z", origin)
+	return err == nil && isMatch
 }

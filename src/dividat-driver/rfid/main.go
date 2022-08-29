@@ -153,7 +153,6 @@ func (handle *Handle) ServerReaderList(w http.ResponseWriter, r *http.Request) {
 	}{
 		Readers: handle.knownReaders,
 	})
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(readersJson)
 }
