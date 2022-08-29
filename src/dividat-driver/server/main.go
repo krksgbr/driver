@@ -113,6 +113,7 @@ func corsHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if len(r.Header["Origin"]) == 1 && isPermissibleOrigin(r.Header["Origin"][0]) {
 			w.Header().Set("Access-Control-Allow-Origin", r.Header["Origin"][0])
+			w.Header().Set("Access-Control-Allow-Private-Network", "true")
 		}
 
 		if r.Method == "OPTIONS" {

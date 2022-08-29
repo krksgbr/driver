@@ -5,6 +5,7 @@
 ### Added
 
 - Add a new bridge for Senso Flex devices
+- Add CORS response headers for private network access
 - Tool to record data from Senso
 - Command-line interface to update firmware on Senso via Ethernet
 
