@@ -148,7 +148,6 @@ const (
 const (
 	HEADER_START_MARKER = 'N'
 	BODY_START_MARKER   = 'P'
-	BYTES_PER_SAMPLE    = 3
 )
 
 // Actually attempt to connect to an individual serial port and pipe its signal into the callback, summarizing
@@ -175,6 +174,21 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 		port.Close()
 		portCtxCancel()
 	}()
+
+	// We hardcode a bitdepth of 8 for sample acquisition.
+	// In principle this could be made configurable and left to the client.
+	// However, parsing of the byte stream requires knowing the bitdepth,
+	// so in order to assemble frame packages the driver would need to
+	// intercept client-to-device commands and configure the parser
+	// accordingly. As we don't need acquisition at other than 8 bits it
+	// seems more robust to fix the mode in the driver right now.
+	BYTES_PER_SAMPLE := 3 // Row, column and sample value of 8 bit
+	BITDEPTH_8_CMD := []byte{'U', 'L', '\n'}
+        _, err = port.Write(BITDEPTH_8_CMD)
+	if err != nil {
+		logger.WithField("error", err).Info("Failed to set bitdepth of 8.")
+		return
+	}
 
 	_, err = port.Write(START_MEASUREMENT_CMD)
 	if err != nil {
