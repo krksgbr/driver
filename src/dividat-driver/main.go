@@ -4,9 +4,11 @@ package main
 
 import (
 	"context"
+	"flag"
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/dividat/driver/src/dividat-driver/firmware"
 	"github.com/dividat/driver/src/dividat-driver/logging"
@@ -39,7 +41,16 @@ func (p *program) Start(s service.Service) error {
 	}
 	logger.SetLevel(logrus.DebugLevel)
 
-	p.close = server.Start(logger)
+	// Command-line flags
+	var permissibleOrigins stringList
+	flag.Var(&permissibleOrigins, "permissible-origin", "Permissible origin to make requests to the driver's HTTP endpoints, may be repeated. Default is a list of common Dividat origins.")
+	flag.Parse()
+	if len(permissibleOrigins) == 0 {
+		permissibleOrigins = defaultOrigins
+	}
+
+	// Start server
+	p.close = server.Start(logger, permissibleOrigins)
 	return nil
 }
 
@@ -62,4 +73,31 @@ func runDaemon() {
 	}
 
 	log.Fatal(s.Run())
+}
+
+// Flags
+
+type stringList []string
+
+func (list *stringList) String() string {
+	return strings.Join(*list, ", ")
+}
+
+func (i *stringList) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
+var defaultOrigins []string = []string{
+	"http://localhost:8080",
+	"https://play.dividat.ch",
+	"https://play.dividat.com",
+	"https://val-play.dividat.ch",
+	"https://val-play.dividat.com",
+	"https://dev-play.dividat.ch",
+	"https://dev-play.dividat.com",
+	"https://lab.dividat.ch",
+	"https://lab.dividat.com",
+	"https://shed.dividat.ch",
+	"https://shed.dividat.com",
 }
