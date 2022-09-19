@@ -116,6 +116,9 @@ func corsHeaders(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Private-Network", "true")
 		}
 
+		// Announce that `Origin` header value may affect response
+		w.Header().Set("Vary", "Origin")
+
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(200)
 			return
