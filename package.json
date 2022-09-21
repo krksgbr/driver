@@ -5,7 +5,8 @@
   "license": "MIT",
   "scripts": {
     "test": "mocha --exit test/index.js",
-    "replay": "node tools/replay/"
+    "replay": "node tools/replay/",
+    "replay-flex": "node tools/replay-flex/"
   },
   "dependencies": {
     "bluebird": "^3.7.2",
