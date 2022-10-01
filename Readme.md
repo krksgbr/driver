@@ -45,7 +45,7 @@ Existing release targets:
 
 ### Deploying
 
-To deploy a new release run: `make deploy`. This can only be done if you are on `master` or `develop` branch, have correctly tagged the revision and have AWS credentials set in your environment.
+To deploy a new release run: `make deploy`. This can only be done if you have correctly tagged the revision and have AWS credentials set in your environment.
 
 ## Installation
 
