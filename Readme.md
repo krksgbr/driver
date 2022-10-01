@@ -58,7 +58,7 @@ A PowerShell script is provided to download and install the latest version as a 
 **Note:** You need to run it as an administrator.
 
 ```
-PS C:\ Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/dividat/driver/develop/install.ps1'))
+PS C:\ Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/dividat/driver/main/install.ps1'))
 ```
 
 Please have a look at the [script](install.ps1) before running it on your system.
