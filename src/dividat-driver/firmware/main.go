@@ -108,7 +108,7 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 		fail = err
 		return
 	}
-	fmt.Println("✓ Firmware transmitted to Senso.")
+	fmt.Println("Success! Firmware transmitted to Senso.")
 	return
 }
 
