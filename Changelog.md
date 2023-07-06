@@ -1,5 +1,11 @@
 # Change Log
 
+## [UNRELEASED]
+
+### Changed
+
+- Let firmware update command look for bootloader if no Senso in regular mode is found
+
 ## [2.3.0] - 2022-10-01
 
 ### Added
