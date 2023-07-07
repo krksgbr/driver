@@ -45,6 +45,8 @@ func Command(flags []string) {
 	err = Update(context.Background(), file, deviceSerial, configuredAddr)
 	if err != nil {
 		fmt.Println(err.Error())
+		fmt.Println()
+		fmt.Println("Update failed. Try turning the Senso off and on, waiting for 30 seconds and then running this update tool again.")
 		os.Exit(1)
 	}
 }
