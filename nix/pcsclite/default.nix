@@ -26,15 +26,14 @@ stdenv.mkDerivation rec {
     "--enable-confdir=/etc"
     "--enable-ipcdir=/run/pcscd"
     # disable unnecessary stuff
-		"--disable-libudev"
-		"--disable-libusb"
-		"--disable-libsystemd"
+    "--disable-libudev"
+    "--disable-libusb"
+    "--disable-libsystemd"
+    "--disable-documentation"
     # enable static linking
     "--enable-static"
   ] ++ lib.optional stdenv.isLinux
-         "--with-systemdsystemunitdir=\${out}/etc/systemd/system"
-    ++ lib.optional (!stdenv.isLinux)
-         "--disable-libsystemd";
+         "--with-systemdsystemunitdir=\${out}/etc/systemd/system";
 
   postConfigure = ''
     sed -i -re '/^#define *PCSCLITE_HP_DROPDIR */ {
