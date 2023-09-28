@@ -1,4 +1,4 @@
-with (import ../nixpkgs.nix) { crossSystem = { config = "x86_64-pc-mingw32"; }; };
+with (import ../nixpkgs.nix) { crossSystem = { config = "x86_64-w64-mingw32"; }; };
 
 stdenv.mkDerivation {
   name = "dividat-driver";
