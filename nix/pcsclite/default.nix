@@ -1,15 +1,14 @@
-{ lib, stdenv, fetchFromGitHub, pkgconfig, autoconf, automake, libtool, flex, python3, perl
-, IOKit ? null }:
+{ lib, stdenv, fetchFromGitHub, pkg-config, autoconf-archive, autoreconfHook, python3, perl }:
 
 stdenv.mkDerivation rec {
   name = "pcsclite-static-${version}";
-  version = "1.8.23";
+  version = "1.9.5";
 
   src = fetchFromGitHub {
     owner = "LudovicRousseau";
     repo = "PCSC";
-    rev = "pcsc-${version}";
-    sha256 = "0pahf0s9zljfi0byi1s78y40k918g1prc37mp4gr4hzb7jff0zw4";
+    rev = "${version}";
+    sha256 = "sha256-ZgYwI/A0dxRYeLxteFG5fiArzJ292q7oaD9uAszSIZo=";
   };
 
   patches = [ ./no-dropdir-literals.patch ];
@@ -41,7 +40,10 @@ stdenv.mkDerivation rec {
     }' config.h
   '';
 
-  nativeBuildInputs = [ autoconf automake libtool flex pkgconfig perl python3 ];
+  enableParallelBuilding = true;
+  nativeBuildInputs = [ autoreconfHook autoconf-archive pkg-config perl ];
+  buildInputs = [ python3 ];
+    #++ lib.optionals polkitSupport [ dbus polkit ];
 
   meta = with lib; {
     description = "Middleware to access a smart card using SCard API (PC/SC)";
