@@ -3,10 +3,8 @@ with (import ./nix/nixpkgs.nix) {};
 mkShell {
 
   buildInputs = [
-
-    go_1_12
+    go
     gcc
-    nix-prefetch-git
 
     # node for tests
     nodejs

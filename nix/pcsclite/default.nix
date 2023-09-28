@@ -1,4 +1,4 @@
-{ stdenv, fetchFromGitHub, pkgconfig, autoconf, automake, libtool, flex, python, perl
+{ lib, stdenv, fetchFromGitHub, pkgconfig, autoconf, automake, libtool, flex, python3, perl
 , IOKit ? null }:
 
 stdenv.mkDerivation rec {
@@ -31,9 +31,9 @@ stdenv.mkDerivation rec {
 		"--disable-libsystemd"
     # enable static linking
     "--enable-static"
-  ] ++ stdenv.lib.optional stdenv.isLinux
+  ] ++ lib.optional stdenv.isLinux
          "--with-systemdsystemunitdir=\${out}/etc/systemd/system"
-    ++ stdenv.lib.optional (!stdenv.isLinux)
+    ++ lib.optional (!stdenv.isLinux)
          "--disable-libsystemd";
 
   postConfigure = ''
@@ -42,9 +42,9 @@ stdenv.mkDerivation rec {
     }' config.h
   '';
 
-  nativeBuildInputs = [ autoconf automake libtool flex pkgconfig perl python ];
+  nativeBuildInputs = [ autoconf automake libtool flex pkgconfig perl python3 ];
 
-  meta = with stdenv.lib; {
+  meta = with lib; {
     description = "Middleware to access a smart card using SCard API (PC/SC)";
     homepage = http://pcsclite.alioth.debian.org/;
     license = licenses.bsd3;

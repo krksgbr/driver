@@ -8,7 +8,7 @@ stdenv.mkDerivation {
   nativeBuildInputs = [ pkgconfig ];
 
   buildInputs = [
-    (import ./../pcsclite {inherit stdenv fetchFromGitHub pkgconfig autoconf automake libtool flex python perl;})
+    (import ./../pcsclite {inherit lib stdenv fetchFromGitHub pkgconfig autoconf automake libtool flex python3 perl;})
   ];
 
 }
