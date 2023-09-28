@@ -1,4 +1,4 @@
-with (import ../nixpkgs.nix) { crossSystem = { config = "x86_64-unknown-linux-musl"; }; };
+with (import ../nixpkgs.nix) { crossSystem = { config = "x86_64-unknown-linux-gnu"; }; };
 
 stdenv.mkDerivation {
   name = "dividat-driver";
@@ -8,9 +8,7 @@ stdenv.mkDerivation {
   nativeBuildInputs = [ pkgconfig ];
 
   buildInputs = [
-    (import ./../pcsclite {
-      inherit lib stdenv fetchFromGitHub  pkg-config autoconf-archive autoreconfHook python3 perl;
-    })
+    pcsclite
   ];
 
 }
