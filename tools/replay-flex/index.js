@@ -6,7 +6,7 @@ const split = require('binary-split')
 const websocket = require('ws')
 const EventEmitter = require('events')
 
-var recFile = argv['_'].pop() || 'rec/zero.dat'
+var recFile = argv['_'].pop() || 'rec/flex/zero.dat'
 let speedFactor = 1/(parseFloat(argv['speed']) || 1)
 let loop = !argv['once']
 
