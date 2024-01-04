@@ -9,7 +9,7 @@ const EventEmitter = require('events')
 
 const control = require('./control')
 
-var recFile = argv['_'].pop() || 'rec/zero.dat'
+var recFile = argv['_'].pop() || 'rec/senso/zero.dat'
 let speedFactor = 1/(parseFloat(argv['speed']) || 1)
 let loop = !argv['once']
 

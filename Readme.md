@@ -87,9 +87,9 @@ Recorded data can be replayed for debugging purposes.
 
 For default settings: `npm run replay`
 
-To replay an other recording: `npm run replay -- rec/simple.dat`
+To replay an other recording: `npm run replay -- rec/senso/simple.dat`
 
-To change the replay speed: `npm run replay -- --speed=0.5 rec/simple.dat`
+To change the replay speed: `npm run replay -- --speed=0.5 rec/senso/simple.dat`
 
 To run without looping: `npm run replay -- --once`
 
