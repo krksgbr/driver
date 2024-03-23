@@ -45,7 +45,8 @@ func Command(flags []string) {
 		os.Exit(1)
 	}
 
-	err = Update(context.Background(), file, deviceSerial, configuredAddr)
+	updateDeps := UpdateDepsImpl{}
+	err = Update(context.Background(), file, deviceSerial, configuredAddr, updateDeps)
 	if err != nil {
 		fmt.Println(err.Error())
 		fmt.Println()
@@ -54,8 +55,16 @@ func Command(flags []string) {
 	}
 }
 
+// Update function dependencies
+type UpdateDeps interface {
+	Discover(service string, deviceSerial *string, ctx context.Context) (addr string, err error)
+	SendDfuCommand(host, port string) error
+	PutTFTP(host, port string, image io.Reader) error
+	Sleep(duration time.Duration)
+}
+
 // Firmware update workhorse
-func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string) (fail error) {
+func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string, impl UpdateDeps) (fail error) {
 	// 1: Find address of a Senso in normal mode
 	var controllerHost string
 	if *configuredAddr != "" {
@@ -65,7 +74,7 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 	} else {
 		// Discover controller address via mDNS
 		ctx, cancel := context.WithTimeout(parentCtx, 15*time.Second)
-		discoveredAddr, err := discover(normalService, deviceSerial, ctx)
+		discoveredAddr, err := impl.Discover(normalService, deviceSerial, ctx)
 		cancel()
 		if err != nil {
 			fmt.Printf("Error: %s\n", err)
@@ -76,7 +85,7 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 
 	// 2: Switch the Senso to bootloader mode
 	if controllerHost != "" {
-		err := sendDfuCommand(controllerHost, controllerPort)
+		err := impl.SendDfuCommand(controllerHost, controllerPort)
 		if err != nil {
 			fmt.Printf("Could not send DFU command to Senso at %s: %s\n", controllerHost, err)
 		}
@@ -90,12 +99,12 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 		dfuHost = *configuredAddr
 	} else {
 		ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
-		discoveredAddr, err := discover(dfuService, deviceSerial, ctx)
+		discoveredAddr, err := impl.Discover(dfuService, deviceSerial, ctx)
 		cancel()
 		if err != nil {
 			// Try to discover boot controller via legacy identifier
 			ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
-			legacyDiscoveredAddr, err := discover(normalService, deviceSerial, ctx)
+			legacyDiscoveredAddr, err := impl.Discover(normalService, deviceSerial, ctx)
 			cancel()
 			if err == nil {
 				dfuHost = legacyDiscoveredAddr
@@ -112,8 +121,8 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 	}
 
 	// 4: Transmit firmware via TFTP
-	time.Sleep(5 * time.Second) // Wait to ensure proper TFTP startup
-	err := putTFTP(dfuHost, tftpPort, image)
+	impl.Sleep(5 * time.Second) // Wait to ensure proper TFTP startup
+	err := impl.PutTFTP(dfuHost, tftpPort, image)
 	if err != nil {
 		fail = err
 		return
@@ -123,7 +132,13 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 	return
 }
 
-func sendDfuCommand(host string, port string) error {
+type UpdateDepsImpl struct{}
+
+func (u UpdateDepsImpl) Sleep(duration time.Duration) {
+	time.Sleep(duration)
+}
+
+func (u UpdateDepsImpl) SendDfuCommand(host string, port string) error {
 	// Header
 	const PROTOCOL_VERSION = 0x00
 	const NUMOFBLOCKS = 0x01
@@ -158,7 +173,7 @@ func sendDfuCommand(host string, port string) error {
 	return nil
 }
 
-func putTFTP(host string, port string, image io.Reader) error {
+func (u UpdateDepsImpl) PutTFTP(host string, port string, image io.Reader) error {
 	client, err := tftp.NewClient(fmt.Sprintf("%s:%s", host, port))
 	if err != nil {
 		return fmt.Errorf("Could not create tftp client: %v", err)
@@ -175,7 +190,7 @@ func putTFTP(host string, port string, image io.Reader) error {
 	return nil
 }
 
-func discover(service string, deviceSerial *string, ctx context.Context) (addr string, err error) {
+func (u UpdateDepsImpl) Discover(service string, deviceSerial *string, ctx context.Context) (addr string, err error) {
 	resolver, err := zeroconf.NewResolver(nil)
 	if err != nil {
 		err = fmt.Errorf("Initializing discovery failed: %v", err)
