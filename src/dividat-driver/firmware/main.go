@@ -19,6 +19,9 @@ import (
 const tftpPort = "69"
 const controllerPort = "55567"
 
+const normalService = "_sensoControl._tcp" // Service type for Sensos in normal mode
+const dfuService = "_sensoUpdate._udp"     // Service type for Sensos in DFU mode
+
 // Command-line interface to Update
 func Command(flags []string) {
 	updateFlags := flag.NewFlagSet("update", flag.ExitOnError)
@@ -62,7 +65,7 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 	} else {
 		// Discover controller address via mDNS
 		ctx, cancel := context.WithTimeout(parentCtx, 15*time.Second)
-		discoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx)
+		discoveredAddr, err := discover(normalService, deviceSerial, ctx)
 		cancel()
 		if err != nil {
 			fmt.Printf("Error: %s\n", err)
@@ -87,12 +90,12 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 		dfuHost = *configuredAddr
 	} else {
 		ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
-		discoveredAddr, err := discover("_sensoUpdate._udp", deviceSerial, ctx)
+		discoveredAddr, err := discover(dfuService, deviceSerial, ctx)
 		cancel()
 		if err != nil {
 			// Try to discover boot controller via legacy identifier
 			ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
-			legacyDiscoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx)
+			legacyDiscoveredAddr, err := discover(normalService, deviceSerial, ctx)
 			cancel()
 			if err == nil {
 				dfuHost = legacyDiscoveredAddr
