@@ -62,7 +62,11 @@ type UpdateDeps interface {
 
 func Update(ctx context.Context, image io.Reader, configuredAddr *string, wantedSerial *string, impl UpdateDeps) (fail error) {
 	if *configuredAddr != "" {
-		return UpdateByAddress(ctx, image, *configuredAddr, impl)
+		host := Host{
+			addr:    *configuredAddr,
+			service: normalService, // Assume it's in normal mode
+		}
+		return UpdateByAddress(ctx, image, host, impl)
 	}
 	return UpdateByDiscovery(ctx, image, wantedSerial, impl)
 }
@@ -76,35 +80,47 @@ func UpdateByDiscovery(parentCtx context.Context, image io.Reader, wantedSerial 
 	return UpdateByAddress(parentCtx, image, controllerHost, impl)
 }
 
-func DiscoverAny(parentCtx context.Context, wantedSerial *string, impl UpdateDeps) (addr string, fail error) {
-	addr, fail = DiscoverWithTimeout(parentCtx, 15*time.Second, normalService, wantedSerial, impl)
+func DiscoverAny(parentCtx context.Context, wantedSerial *string, impl UpdateDeps) (host Host, fail error) {
+	host, fail = DiscoverWithTimeout(parentCtx, 15*time.Second, normalService, wantedSerial, impl)
 	if fail != nil {
-		addr, fail = DiscoverWithTimeout(parentCtx, 15*time.Second, dfuService, wantedSerial, impl)
+		host, fail = DiscoverWithTimeout(parentCtx, 15*time.Second, dfuService, wantedSerial, impl)
 	}
-	return addr, fail
+	return host, fail
 }
 
-func UpdateByAddress(parentCtx context.Context, image io.Reader, controllerHost string, impl UpdateDeps) (fail error) {
-	// 1: Try to switch Senso to bootloader mode
-	err := impl.SendDfuCommand(controllerHost, controllerPort)
+// Represents a host that has already been discovered
+type Host struct {
+	addr    string
+	service string
+}
 
-	// If sending the DFU command failed, the Senso could already be in bootloader mode.
-	// Keep going.
-	if err != nil {
-		fmt.Printf("Could not send DFU command to Senso at %s: %s\n", controllerHost, err)
-	}
+func UpdateByAddress(parentCtx context.Context, image io.Reader, host Host, impl UpdateDeps) (fail error) {
+	var dfuHost Host
+	// 1: Try to send DFU command to Senso, unless it's already known to be in bootloader mode
+	if host.service == normalService {
+		err := impl.SendDfuCommand(host.addr, controllerPort)
 
-	// 2: (Re-)discover Senso in DFU mode
-	dfuHost, discoveryError := DiscoverWithTimeout(parentCtx, 60*time.Second, dfuService, nil, impl)
-	if discoveryError != nil {
-		fail = discoveryError
-		return
+		// If sending the DFU command failed, the Senso could already be in bootloader mode.
+		// Keep going.
+		if err != nil {
+			fmt.Printf("Could not send DFU command to Senso at %s: %s\n", host.addr, err)
+		}
+
+		// 2: (Re-)discover Senso in DFU mode
+		discoveredHost, discoveryError := DiscoverWithTimeout(parentCtx, 60*time.Second, dfuService, nil, impl)
+		if discoveryError != nil {
+			fail = discoveryError
+			return
+		}
+		dfuHost = discoveredHost
+	} else {
+		dfuHost = host
 	}
 
 	// 2. Try transferring the firmware via TFTP
 	// Wait to ensure proper TFTP startup
 	impl.Sleep(5 * time.Second)
-	err = impl.PutTFTP(dfuHost, tftpPort, image)
+	err := impl.PutTFTP(dfuHost.addr, tftpPort, image)
 	if err != nil {
 		fail = err
 		return
@@ -120,11 +136,11 @@ func DiscoverWithTimeout(
 	service string,
 	wantedSerial *string,
 	impl UpdateDeps,
-) (string, error) {
+) (Host, error) {
 	ctx, cancel := context.WithTimeout(parentCtx, duration)
 	addr, err := impl.Discover(ctx, service, wantedSerial)
 	cancel()
-	return addr, err
+	return Host{addr: addr, service: service}, err
 }
 
 type UpdateDepsImpl struct{}
