@@ -141,7 +141,7 @@ func Test(t *testing.T) {
 				t.Skip()
 			} else {
 				ctx := context.Background()
-				Update(ctx, setup.Image, &setup.Serial, &setup.Address, mockDeps)
+				Update(ctx, setup.Image, &setup.Address, &setup.Serial, mockDeps)
 				assertLogsEqual(testCase.expectedLog, mockDeps.Log, t)
 			}
 		})
@@ -170,14 +170,14 @@ func (m *MockDeps) Sleep(d time.Duration) {
 	m.Log = append(m.Log, logEntry)
 }
 
-func (m *MockDeps) Discover(service string, deviceSerial *string, ctx context.Context) (addr string, err error) {
-	serial := *deviceSerial
-	if serial == "" {
-		serial = "none"
+func (m *MockDeps) Discover(ctx context.Context, service string, wantedSerial *string) (string, error) {
+	serial := "none"
+	if wantedSerial != nil && *wantedSerial != "" {
+		serial = *wantedSerial
 	}
 	logEntry := fmt.Sprintf("Discover | service: %s, deviceSerial: %s", service, serial)
 	m.Log = append(m.Log, logEntry)
-	return m.setup.DiscoverFunc(service, deviceSerial, ctx)
+	return m.setup.DiscoverFunc(service, wantedSerial, ctx)
 }
 
 func (m *MockDeps) SendDfuCommand(host, port string) error {

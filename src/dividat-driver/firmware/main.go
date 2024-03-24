@@ -27,13 +27,8 @@ func Command(flags []string) {
 	updateFlags := flag.NewFlagSet("update", flag.ExitOnError)
 	imagePath := updateFlags.String("i", "", "Firmware image path")
 	configuredAddr := updateFlags.String("a", "", "Senso address (optional)")
-	sensoSerial := updateFlags.String("s", "", "Senso serial (optional)")
+	configuredSerial := updateFlags.String("s", "", "Senso serial (optional)")
 	updateFlags.Parse(flags)
-
-	var deviceSerial *string = nil
-	if *sensoSerial != "" {
-		deviceSerial = sensoSerial
-	}
 
 	if *imagePath == "" {
 		flag.PrintDefaults()
@@ -45,84 +40,71 @@ func Command(flags []string) {
 		os.Exit(1)
 	}
 
-	updateDeps := UpdateDepsImpl{}
-	err = Update(context.Background(), file, deviceSerial, configuredAddr, updateDeps)
+	err = Update(context.Background(), file, configuredAddr, configuredSerial, UpdateDepsImpl{})
 	if err != nil {
 		fmt.Println(err.Error())
 		fmt.Println()
 		fmt.Println("Update failed. Try turning the Senso off and on, waiting for 30 seconds and then running this update tool again.")
 		os.Exit(1)
 	}
+
+	os.Exit(0)
+
 }
 
 // Update function dependencies
 type UpdateDeps interface {
-	Discover(service string, deviceSerial *string, ctx context.Context) (addr string, err error)
+	Discover(ctx context.Context, service string, wantedSerial *string) (string, error)
 	SendDfuCommand(host, port string) error
 	PutTFTP(host, port string, image io.Reader) error
 	Sleep(duration time.Duration)
 }
 
-// Firmware update workhorse
-func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string, impl UpdateDeps) (fail error) {
-	// 1: Find address of a Senso in normal mode
-	var controllerHost string
+func Update(ctx context.Context, image io.Reader, configuredAddr *string, wantedSerial *string, impl UpdateDeps) (fail error) {
 	if *configuredAddr != "" {
-		// Use specified controller address
-		controllerHost = *configuredAddr
-		fmt.Printf("Using specified controller address '%s'.\n", controllerHost)
-	} else {
-		// Discover controller address via mDNS
-		ctx, cancel := context.WithTimeout(parentCtx, 15*time.Second)
-		discoveredAddr, err := impl.Discover(normalService, deviceSerial, ctx)
-		cancel()
-		if err != nil {
-			fmt.Printf("Error: %s\n", err)
-		} else {
-			controllerHost = discoveredAddr
-		}
+		return UpdateByAddress(ctx, image, *configuredAddr, impl)
+	}
+	return UpdateByDiscovery(ctx, image, wantedSerial, impl)
+}
+
+func UpdateByDiscovery(parentCtx context.Context, image io.Reader, wantedSerial *string, impl UpdateDeps) (fail error) {
+	controllerHost, err := DiscoverAny(parentCtx, wantedSerial, impl)
+	if err != nil {
+		fail = fmt.Errorf("Discovery failed.")
+		return
+	}
+	return UpdateByAddress(parentCtx, image, controllerHost, impl)
+}
+
+func DiscoverAny(parentCtx context.Context, wantedSerial *string, impl UpdateDeps) (addr string, fail error) {
+	addr, fail = DiscoverWithTimeout(parentCtx, 15*time.Second, normalService, wantedSerial, impl)
+	if fail != nil {
+		addr, fail = DiscoverWithTimeout(parentCtx, 15*time.Second, dfuService, wantedSerial, impl)
+	}
+	return addr, fail
+}
+
+func UpdateByAddress(parentCtx context.Context, image io.Reader, controllerHost string, impl UpdateDeps) (fail error) {
+	// 1: Try to switch Senso to bootloader mode
+	err := impl.SendDfuCommand(controllerHost, controllerPort)
+
+	// If sending the DFU command failed, the Senso could already be in bootloader mode.
+	// Keep going.
+	if err != nil {
+		fmt.Printf("Could not send DFU command to Senso at %s: %s\n", controllerHost, err)
 	}
 
-	// 2: Switch the Senso to bootloader mode
-	if controllerHost != "" {
-		err := impl.SendDfuCommand(controllerHost, controllerPort)
-		if err != nil {
-			fmt.Printf("Could not send DFU command to Senso at %s: %s\n", controllerHost, err)
-		}
-	} else {
-		fmt.Printf("Could not discover a Senso in regular mode, now trying to detect a Senso already in bootloader mode.\n")
+	// 2: (Re-)discover Senso in DFU mode
+	dfuHost, discoveryError := DiscoverWithTimeout(parentCtx, 60*time.Second, dfuService, nil, impl)
+	if discoveryError != nil {
+		fail = discoveryError
+		return
 	}
 
-	// 3: Find address of Senso in bootloader mode
-	var dfuHost string
-	if *configuredAddr != "" {
-		dfuHost = *configuredAddr
-	} else {
-		ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
-		discoveredAddr, err := impl.Discover(dfuService, deviceSerial, ctx)
-		cancel()
-		if err != nil {
-			// Try to discover boot controller via legacy identifier
-			ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
-			legacyDiscoveredAddr, err := impl.Discover(normalService, deviceSerial, ctx)
-			cancel()
-			if err == nil {
-				dfuHost = legacyDiscoveredAddr
-			} else if controllerHost != "" {
-				fmt.Printf("Could not discover update service, trying to fall back to previous discovery %s.\n", controllerHost)
-				dfuHost = controllerHost
-			} else {
-				fail = fmt.Errorf("Could not find any Senso bootloader to transmit firmware to: %s", err)
-				return
-			}
-		} else {
-			dfuHost = discoveredAddr
-		}
-	}
-
-	// 4: Transmit firmware via TFTP
-	impl.Sleep(5 * time.Second) // Wait to ensure proper TFTP startup
-	err := impl.PutTFTP(dfuHost, tftpPort, image)
+	// 2. Try transferring the firmware via TFTP
+	// Wait to ensure proper TFTP startup
+	impl.Sleep(5 * time.Second)
+	err = impl.PutTFTP(dfuHost, tftpPort, image)
 	if err != nil {
 		fail = err
 		return
@@ -130,6 +112,19 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 
 	fmt.Println("Success! Firmware transmitted to Senso.")
 	return
+}
+
+func DiscoverWithTimeout(
+	parentCtx context.Context,
+	duration time.Duration,
+	service string,
+	wantedSerial *string,
+	impl UpdateDeps,
+) (string, error) {
+	ctx, cancel := context.WithTimeout(parentCtx, duration)
+	addr, err := impl.Discover(ctx, service, wantedSerial)
+	cancel()
+	return addr, err
 }
 
 type UpdateDepsImpl struct{}
@@ -190,7 +185,7 @@ func (u UpdateDepsImpl) PutTFTP(host string, port string, image io.Reader) error
 	return nil
 }
 
-func (u UpdateDepsImpl) Discover(service string, deviceSerial *string, ctx context.Context) (addr string, err error) {
+func (u UpdateDepsImpl) Discover(ctx context.Context, service string, wantedSerial *string) (addr string, err error) {
 	resolver, err := zeroconf.NewResolver(nil)
 	if err != nil {
 		err = fmt.Errorf("Initializing discovery failed: %v", err)
@@ -206,7 +201,10 @@ func (u UpdateDepsImpl) Discover(service string, deviceSerial *string, ctx conte
 		err = fmt.Errorf("Browsing failed: %v", err)
 		return
 	}
+	return resolveEntries(entries, wantedSerial)
+}
 
+func resolveEntries(entries chan *zeroconf.ServiceEntry, wantedSerial *string) (addr string, err error) {
 	devices := make(map[string][]string)
 	entriesWithoutSerial := 0
 	select {
@@ -225,7 +223,7 @@ func (u UpdateDepsImpl) Discover(service string, deviceSerial *string, ctx conte
 				serial = fmt.Sprintf("UNKNOWN-%d", entriesWithoutSerial)
 			}
 		}
-		if deviceSerial != nil && serial != *deviceSerial {
+		if wantedSerial != nil && serial != *wantedSerial {
 			break
 		}
 		for _, addrCandidate := range entry.AddrIPv4 {
@@ -237,10 +235,10 @@ func (u UpdateDepsImpl) Discover(service string, deviceSerial *string, ctx conte
 		}
 	}
 
-	if len(devices) == 0 && deviceSerial == nil {
-		err = fmt.Errorf("Could not find any devices for service %s.", service)
-	} else if len(devices) == 0 && deviceSerial != nil {
-		err = fmt.Errorf("Could not find Senso %s.", *deviceSerial)
+	if len(devices) == 0 && wantedSerial == nil {
+		err = fmt.Errorf("Serial not found.")
+	} else if len(devices) == 0 && wantedSerial != nil {
+		err = fmt.Errorf("Could not find Senso %s.", *wantedSerial)
 	} else if len(devices) == 1 {
 		for serial, addrs := range devices {
 			addr = addrs[0]
@@ -252,6 +250,7 @@ func (u UpdateDepsImpl) Discover(service string, deviceSerial *string, ctx conte
 		return
 	}
 	return
+
 }
 
 func cleanSerial(serialStr string) string {
