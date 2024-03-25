@@ -75,6 +75,9 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 	if controllerHost != "" {
 		err := sendDfuCommand(controllerHost, controllerPort)
 		if err != nil {
+			// Log the failure, but continue anyway, as the Senso might have been left in
+			// bootloader mode when a previous update process failed. Not all versions of
+			// the firmware automtically exit from the bootloader mode upon restart.
 			fmt.Printf("Could not send DFU command to Senso at %s: %s\n", controllerHost, err)
 		}
 	} else {
@@ -90,7 +93,12 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 		discoveredAddr, err := discover("_sensoUpdate._udp", deviceSerial, ctx)
 		cancel()
 		if err != nil {
-			// Try to discover boot controller via legacy identifier
+			// Up to firmware 2.0.0.0 the bootloader advertised itself with the same
+			// service identifier as the application level firmware. To support such
+			// legacy devices, we look for `_sensoControl` again at this point, if
+			// the other service has not been found.
+			// We do need to rediscover, as the legacy device may still just have
+			// restarted into the bootloader and obtained a new IP address.
 			ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
 			legacyDiscoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx)
 			cancel()
