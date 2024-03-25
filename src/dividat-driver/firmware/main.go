@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -46,69 +45,86 @@ func Command(flags []string) {
 	err = Update(context.Background(), file, deviceSerial, configuredAddr)
 	if err != nil {
 		fmt.Println(err.Error())
+		fmt.Println()
+		fmt.Println("Update failed. Try turning the Senso off and on, waiting for 30 seconds and then running this update tool again.")
 		os.Exit(1)
 	}
 }
 
 // Firmware update workhorse
 func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string) (fail error) {
-	// Discover Senso IP
+	// 1: Find address of a Senso in normal mode
 	var controllerHost string
-	if *configuredAddr == "" {
-		ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	if *configuredAddr != "" {
+		// Use specified controller address
+		controllerHost = *configuredAddr
+		fmt.Printf("Using specified controller address '%s'.\n", controllerHost)
+	} else {
+		// Discover controller address via mDNS
+		ctx, cancel := context.WithTimeout(parentCtx, 15*time.Second)
 		discoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx)
 		cancel()
 		if err != nil {
-			fail = err
-			return
+			fmt.Printf("Error: %s\n", err)
+		} else {
+			controllerHost = discoveredAddr
 		}
+	}
 
-		controllerHost = discoveredAddr
+	// 2: Switch the Senso to bootloader mode
+	if controllerHost != "" {
+		err := sendDfuCommand(controllerHost, controllerPort)
+		if err != nil {
+			// Log the failure, but continue anyway, as the Senso might have been left in
+			// bootloader mode when a previous update process failed. Not all versions of
+			// the firmware automtically exit from the bootloader mode upon restart.
+			fmt.Printf("Could not send DFU command to Senso at %s: %s\n", controllerHost, err)
+		}
 	} else {
-		controllerHost = *configuredAddr
+		fmt.Printf("Could not discover a Senso in regular mode, now trying to detect a Senso already in bootloader mode.\n")
 	}
 
-	// Request reboot into boot controller
-	err := sendDfuCommand(controllerHost, controllerPort)
-	if err != nil {
-		fail = err
-		return
-	}
-
-	// Re-discover Senso IP in case it changes on reboot
+	// 3: Find address of Senso in bootloader mode
 	var dfuHost string
-	if *configuredAddr == "" {
+	if *configuredAddr != "" {
+		dfuHost = *configuredAddr
+	} else {
 		ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
 		discoveredAddr, err := discover("_sensoUpdate._udp", deviceSerial, ctx)
 		cancel()
 		if err != nil {
-			// Try to discover boot controller via legacy identifier
+			// Up to firmware 2.0.0.0 the bootloader advertised itself with the same
+			// service identifier as the application level firmware. To support such
+			// legacy devices, we look for `_sensoControl` again at this point, if
+			// the other service has not been found.
+			// We do need to rediscover, as the legacy device may still just have
+			// restarted into the bootloader and obtained a new IP address.
 			ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
 			legacyDiscoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx)
 			cancel()
-			if err != nil {
+			if err == nil {
+				dfuHost = legacyDiscoveredAddr
+			} else if controllerHost != "" {
 				fmt.Printf("Could not discover update service, trying to fall back to previous discovery %s.\n", controllerHost)
 				dfuHost = controllerHost
 			} else {
-				dfuHost = legacyDiscoveredAddr
+				fail = fmt.Errorf("Could not find any Senso bootloader to transmit firmware to: %s", err)
+				return
 			}
 		} else {
 			dfuHost = discoveredAddr
 		}
-	} else {
-		dfuHost = *configuredAddr
 	}
 
-	// Wait briefly after discovery to ensure proper TFTP startup
-	time.Sleep(5 * time.Second)
-
-	// Transmit firmware via TFTP
-	err = putTFTP(dfuHost, tftpPort, image)
+	// 4: Transmit firmware via TFTP
+	time.Sleep(5 * time.Second) // Wait to ensure proper TFTP startup
+	err := putTFTP(dfuHost, tftpPort, image)
 	if err != nil {
 		fail = err
 		return
 	}
-	fmt.Println("✓ Firmware transmitted to Senso.")
+
+	fmt.Println("Success! Firmware transmitted to Senso.")
 	return
 }
 
@@ -212,7 +228,7 @@ func discover(service string, deviceSerial *string, ctx context.Context) (addr s
 	}
 
 	if len(devices) == 0 && deviceSerial == nil {
-		err = errors.New("No Sensos discovered.")
+		err = fmt.Errorf("Could not find any devices for service %s.", service)
 	} else if len(devices) == 0 && deviceSerial != nil {
 		err = fmt.Errorf("Could not find Senso %s.", *deviceSerial)
 	} else if len(devices) == 1 {
