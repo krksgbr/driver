@@ -42,7 +42,16 @@ func Command(flags []string) {
 		os.Exit(1)
 	}
 
-	err = Update(context.Background(), file, deviceSerial, configuredAddr)
+	msgChan := make(chan string)
+	go func() {
+		for msg := range msgChan {
+			fmt.Println(msg)
+		}
+	}()
+
+	Update(context.Background(), file, deviceSerial, configuredAddr, msgChan)
+	close(msgChan)
+
 	if err != nil {
 		fmt.Println(err.Error())
 		fmt.Println()
@@ -52,20 +61,20 @@ func Command(flags []string) {
 }
 
 // Firmware update workhorse
-func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string) (fail error) {
+func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string, logChan chan<- string) (fail error) {
 	// 1: Find address of a Senso in normal mode
 	var controllerHost string
 	if *configuredAddr != "" {
 		// Use specified controller address
 		controllerHost = *configuredAddr
-		fmt.Printf("Using specified controller address '%s'.\n", controllerHost)
+		logChan <- fmt.Sprintf("Using specified controller address '%s'.", controllerHost)
 	} else {
 		// Discover controller address via mDNS
 		ctx, cancel := context.WithTimeout(parentCtx, 15*time.Second)
 		discoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx)
 		cancel()
 		if err != nil {
-			fmt.Printf("Error: %s\n", err)
+			logChan <- fmt.Sprintf("Error: %s", err)
 		} else {
 			controllerHost = discoveredAddr
 		}
@@ -78,10 +87,10 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 			// Log the failure, but continue anyway, as the Senso might have been left in
 			// bootloader mode when a previous update process failed. Not all versions of
 			// the firmware automtically exit from the bootloader mode upon restart.
-			fmt.Printf("Could not send DFU command to Senso at %s: %s\n", controllerHost, err)
+			logChan <- fmt.Sprintf("Could not send DFU command to Senso at %s: %s", controllerHost, err)
 		}
 	} else {
-		fmt.Printf("Could not discover a Senso in regular mode, now trying to detect a Senso already in bootloader mode.\n")
+		logChan <- "Could not discover a Senso in regular mode, now trying to detect a Senso already in bootloader mode."
 	}
 
 	// 3: Find address of Senso in bootloader mode
@@ -105,10 +114,12 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 			if err == nil {
 				dfuHost = legacyDiscoveredAddr
 			} else if controllerHost != "" {
-				fmt.Printf("Could not discover update service, trying to fall back to previous discovery %s.\n", controllerHost)
+				logChan <- fmt.Sprintf("Could not discover update service, trying to fall back to previous discovery %s.\n", controllerHost)
 				dfuHost = controllerHost
 			} else {
-				fail = fmt.Errorf("Could not find any Senso bootloader to transmit firmware to: %s", err)
+				msg := fmt.Sprintf("Could not find any Senso bootloader to transmit firmware to: %s", err)
+				logChan <- msg
+				fail = fmt.Errorf(msg)
 				return
 			}
 		} else {
@@ -124,7 +135,7 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 		return
 	}
 
-	fmt.Println("Success! Firmware transmitted to Senso.")
+	logChan <- "Success! Firmware transmitted to Senso."
 	return
 }
 
