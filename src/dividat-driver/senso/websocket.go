@@ -24,6 +24,7 @@ type Command struct {
 	*Disconnect
 
 	*Discover
+	*UpdateFirmware
 }
 
 func prettyPrintCommand(command Command) string {
@@ -53,6 +54,11 @@ type Disconnect struct{}
 // Discover command
 type Discover struct {
 	Duration int `json:"duration"`
+}
+
+type UpdateFirmware struct {
+	Address string `json:"address"`
+	Image   string `json:"image"`
 }
 
 // UnmarshalJSON implements encoding/json Unmarshaler interface
@@ -85,6 +91,11 @@ func (command *Command) UnmarshalJSON(data []byte) error {
 			return err
 		}
 
+	} else if temp.Type == "UpdateFirmware" {
+		err := json.Unmarshal(data, &command.UpdateFirmware)
+		if err != nil {
+			return err
+		}
 	} else {
 		return errors.New("can not decode unknown command")
 	}
@@ -97,6 +108,8 @@ type Message struct {
 	*Status
 
 	Discovered *zeroconf.ServiceEntry
+
+	FirmwareUpdateProgress *string
 }
 
 // Status is a message containing status information
@@ -126,6 +139,14 @@ func (message *Message) MarshalJSON() ([]byte, error) {
 			IP:           append(message.Discovered.AddrIPv4, message.Discovered.AddrIPv6...),
 		})
 
+	} else if message.FirmwareUpdateProgress != nil {
+		return json.Marshal(&struct {
+			Type    string  `json:"type"`
+			Message *string `json:"message"`
+		}{
+			Type:    "FirmwareUpdateProgress",
+			Message: message.FirmwareUpdateProgress,
+		})
 	}
 
 	return nil, errors.New("could not marshal message")
@@ -293,6 +314,17 @@ func (handle *Handle) dispatchCommand(ctx context.Context, log *logrus.Entry, co
 
 		return nil
 
+	} else if command.UpdateFirmware != nil {
+		msgChan := make(chan string)
+		go func() {
+			for msg := range msgChan {
+				sendMessage(Message{
+					FirmwareUpdateProgress: &msg,
+				})
+			}
+		}()
+		handle.ProcessFirmwareUpdateRequest(*command.UpdateFirmware, msgChan)
+		close(msgChan)
 	}
 	return nil
 }
