@@ -5,6 +5,7 @@
 ### Changed
 
 - Let firmware update command look for bootloader if no Senso in regular mode is found
+- Drop support for connecting to Sensos on port 55568
 
 ## [2.3.0] - 2022-10-01
 
