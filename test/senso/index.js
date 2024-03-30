@@ -47,16 +47,14 @@ describe('Basic functionality', () => {
   }
 
   it('Can connect to a mock Senso.', async function () {
-    // It takes at least 1s to connect (as driver waits one sec between data and control connection)
-    this.timeout(1500)
+    this.timeout(500)
 
     await connectWS('ws://127.0.0.1:8382/senso')
     .then(connectWithMockSenso)
   })
 
   it('Can connect and disconnect to a mock Senso.', async function () {
-    // It takes at least 1s to connect (as driver waits one sec between data and control connection)
-    this.timeout(1500)
+    this.timeout(500)
 
     var ws = await connectWS('ws://127.0.0.1:8382/senso')
 
@@ -84,8 +82,7 @@ describe('Basic functionality', () => {
   })
 
   it('Disconnect on multiple Connects.', async function () {
-    // It takes at least 1s to connect (as driver waits one sec between data and control connection)
-    this.timeout(1500)
+    this.timeout(500)
 
     var ws = await connectWS('ws://127.0.0.1:8382/senso')
 
@@ -137,7 +134,7 @@ describe('Basic functionality', () => {
 
     const chunkSize = 64
     const n = 1000
-    this.timeout(1000 + n * 4 + 500)
+    this.timeout(500 + n * 4 + 500)
 
     const expectOnWS = new Promise((resolve, reject) => {
       var received = 0
@@ -160,7 +157,7 @@ describe('Basic functionality', () => {
     return expectOnWS
   })
 
-  it('Data is forwarded from WS to control channel', async function () {
+  it('Data is forwarded from WS to the Senso', async function () {
     const sensoWS = await connectWS('ws://127.0.0.1:8382/senso')
     sensoWS.send(JSON.stringify({
       type: 'Connect',
@@ -171,7 +168,7 @@ describe('Basic functionality', () => {
 
     const chunkSize = 64
     const n = 1000
-    this.timeout(1000 + n * 2 + 500)
+    this.timeout(500 + n * 2 + 500)
 
     const expectData = new Promise((resolve, reject) => {
       var received = 0
