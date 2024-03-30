@@ -8,12 +8,12 @@ const mock = require('./mock')
 // TESTS
 
 describe('Basic functionality', () => {
-  var driver
-  var senso 
+  let driver
+  let senso 
 
   beforeEach(async () => {
   // Start driver
-    var code = 0
+    let code = 0
     driver = startDriver().on('exit', (c) => {
       code = c
     })
@@ -56,27 +56,27 @@ describe('Basic functionality', () => {
   it('Can connect and disconnect to a mock Senso.', async function () {
     this.timeout(500)
 
-    var ws = await connectWS('ws://127.0.0.1:8382/senso')
+    const ws = await connectWS('ws://127.0.0.1:8382/senso')
 
-    var cmd = JSON.stringify({
+    const connectCmd = JSON.stringify({
       type: 'Connect',
       address: '127.0.0.1'
     })
 
-    ws.send(cmd)
+    ws.send(connectCmd)
 
-    var connection = await getConnection(senso)
-    var connectionCloses = new Promise((resolve, reject) => {
+    const connection = await getConnection(senso)
+    const connectionCloses = new Promise((resolve, reject) => {
       connection.on('close', () => {
         resolve()
       })
     })
 
-    cmd = JSON.stringify({
+    const disconnectCmd = JSON.stringify({
       type: 'Disconnect'
     })
 
-    ws.send(cmd)
+    ws.send(disconnectCmd)
 
     return connectionCloses
   })
@@ -84,28 +84,22 @@ describe('Basic functionality', () => {
   it('Disconnect on multiple Connects.', async function () {
     this.timeout(500)
 
-    var ws = await connectWS('ws://127.0.0.1:8382/senso')
-
-    var cmd = JSON.stringify({
+    const ws = await connectWS('ws://127.0.0.1:8382/senso')
+    const connectCmd = JSON.stringify({
       type: 'Connect',
       address: '127.0.0.1'
     })
 
-    ws.send(cmd)
+    ws.send(connectCmd)
 
-    var connection = await getConnection(senso)
-    var connectionCloses = new Promise((resolve, reject) => {
+    const connection = await getConnection(senso)
+    const connectionCloses = new Promise((resolve, reject) => {
       connection.on('close', () => {
         resolve()
       })
     })
 
-    cmd = JSON.stringify({
-      type: 'Connect',
-      address: '127.0.0.1'
-    })
-
-    ws.send(cmd)
+    ws.send(connectCmd)
 
     return connectionCloses;
   })
@@ -137,7 +131,7 @@ describe('Basic functionality', () => {
     this.timeout(500 + n * 4 + 500)
 
     const expectOnWS = new Promise((resolve, reject) => {
-      var received = 0
+      let received = 0
       sensoWS.on('message', (msg) => {
         received = received + msg.length
 
@@ -171,7 +165,7 @@ describe('Basic functionality', () => {
     this.timeout(500 + n * 2 + 500)
 
     const expectData = new Promise((resolve, reject) => {
-      var received = 0
+      let received = 0
       connection.on('data', (data) => {
         received = received + data.length
 
