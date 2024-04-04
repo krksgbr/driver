@@ -352,13 +352,35 @@ func (handle *Handle) dispatchCommand(ctx context.Context, log *logrus.Entry, co
 		return nil
 
 	} else if command.UpdateFirmware != nil {
-		go handle.ProcessFirmwareUpdateRequest(*command.UpdateFirmware, func(msg FirmwareUpdateMessage) {
-			sendMessage(Message{
-				FirmwareUpdateMessage: &msg,
-			})
+		go handle.ProcessFirmwareUpdateRequest(*command.UpdateFirmware, SendMsg{
+			progress: func(msg string) {
+				sendMessage(firmwareUpdateProgress(msg))
+			},
+			failure: func(msg string) {
+				sendMessage(firmwareUpdateFailure(msg))
+			},
+			success: func(msg string) {
+				sendMessage(firmwareUpdateSuccess(msg))
+			},
 		})
 	}
 	return nil
+}
+
+func firmwareUpdateSuccess(msg string) Message {
+	return firmwareUpdateMessage(FirmwareUpdateMessage{FirmwareUpdateSuccess: &msg})
+}
+
+func firmwareUpdateFailure(msg string) Message {
+	return firmwareUpdateMessage(FirmwareUpdateMessage{FirmwareUpdateFailure: &msg})
+}
+
+func firmwareUpdateProgress(msg string) Message {
+	return firmwareUpdateMessage(FirmwareUpdateMessage{FirmwareUpdateProgress: &msg})
+}
+
+func firmwareUpdateMessage(msg FirmwareUpdateMessage) Message {
+	return Message{FirmwareUpdateMessage: &msg}
 }
 
 // rx_data_loop reads data from Senso and forwards it up the WebSocket

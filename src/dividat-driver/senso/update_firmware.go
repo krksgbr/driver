@@ -11,7 +11,11 @@ import (
 	"github.com/dividat/driver/src/dividat-driver/firmware"
 )
 
-type OnUpdate func(msg FirmwareUpdateMessage)
+type SendMsg struct {
+	progress func(string)
+	failure  func(string)
+	success  func(string)
+}
 
 func (handle *Handle) isUpdatingFirmware() bool {
 	handle.firmwareUpdateMutex.Lock()
@@ -26,37 +30,33 @@ func (handle *Handle) setUpdatingFirmware(state bool) {
 	handle.firmwareUpdateMutex.Unlock()
 }
 
+
 // Disconnect from current connection
-func (handle *Handle) ProcessFirmwareUpdateRequest(command UpdateFirmware, onUpdate OnUpdate) {
+func (handle *Handle) ProcessFirmwareUpdateRequest(command UpdateFirmware, send SendMsg) {
 	handle.log.Info("Processing firmware update request.")
 	handle.setUpdatingFirmware(true)
 
-	onProgress := func(progressMsg string) {
-		onUpdate(FirmwareUpdateMessage{FirmwareUpdateProgress: &progressMsg})
-	}
-
 	if handle.cancelCurrentConnection != nil {
-		onProgress("Disconnecting from the Senso")
+		send.progress("Disconnecting from the Senso")
 		handle.cancelCurrentConnection()
 	}
 
 	image, err := decodeImage(command.Image)
 	if err != nil {
 		msg := fmt.Sprintf("Error decoding base64 string: %v", err)
-		onUpdate(FirmwareUpdateMessage{FirmwareUpdateFailure: &msg})
+		send.failure(msg)
 		handle.log.Error(msg)
 	}
 
-	onProgress("Waiting 10 seconds for connection teardown")
+	send.progress("Waiting 10 seconds for connection teardown")
 	time.Sleep(10 * time.Second)
-	err = firmware.UpdateBySerial(context.Background(), command.SerialNumber, image, onProgress)
+	err = firmware.UpdateBySerial(context.Background(), command.SerialNumber, image, send.progress)
 	if err != nil {
 		failureMsg := fmt.Sprintf("Failed to update firmware: %v", err)
-		onUpdate(FirmwareUpdateMessage{FirmwareUpdateFailure: &failureMsg})
+		send.failure(failureMsg)
 		handle.log.Error(failureMsg)
 	} else {
-		successMsg := "Firmware successfully transmitted."
-		onUpdate(FirmwareUpdateMessage{FirmwareUpdateSuccess: &successMsg})
+		send.success("Firmware successfully transmitted.")
 	}
 	handle.setUpdatingFirmware(false)
 }
