@@ -57,8 +57,8 @@ type Discover struct {
 }
 
 type UpdateFirmware struct {
-	Address string `json:"address"`
-	Image   string `json:"image"`
+	SerialNumber string `json:"serialNumber"`
+	Image        string `json:"image"`
 }
 
 // UnmarshalJSON implements encoding/json Unmarshaler interface
