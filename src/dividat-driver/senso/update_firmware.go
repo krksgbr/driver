@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/dividat/driver/src/dividat-driver/firmware"
 )
@@ -48,8 +47,6 @@ func (handle *Handle) ProcessFirmwareUpdateRequest(command UpdateFirmware, send 
 		handle.log.Error(msg)
 	}
 
-	send.progress("Waiting 10 seconds for connection teardown")
-	time.Sleep(10 * time.Second)
 	err = firmware.UpdateBySerial(context.Background(), command.SerialNumber, image, send.progress)
 	if err != nil {
 		failureMsg := fmt.Sprintf("Failed to update firmware: %v", err)
