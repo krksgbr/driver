@@ -352,13 +352,11 @@ func (handle *Handle) dispatchCommand(ctx context.Context, log *logrus.Entry, co
 		return nil
 
 	} else if command.UpdateFirmware != nil {
-		go func() {
-			handle.ProcessFirmwareUpdateRequest(*command.UpdateFirmware, func(msg FirmwareUpdateMessage) {
-				sendMessage(Message{
-					FirmwareUpdateMessage: &msg,
-				})
+		go handle.ProcessFirmwareUpdateRequest(*command.UpdateFirmware, func(msg FirmwareUpdateMessage) {
+			sendMessage(Message{
+				FirmwareUpdateMessage: &msg,
 			})
-		}()
+		})
 	}
 	return nil
 }
