@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/libp2p/zeroconf/v2"
 	"github.com/pin/tftp"
 )
@@ -81,7 +82,19 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 
 	// 2: Switch the Senso to bootloader mode
 	if controllerHost != "" {
-		err := sendDfuCommand(controllerHost, controllerPort, onProgress)
+
+		trySendDfu := func() error {
+			err := sendDfuCommand(controllerHost, controllerPort, onProgress)
+			return err
+		}
+
+		backoffStrategy := backoff.NewExponentialBackOff()
+		backoffStrategy.MaxElapsedTime = 30 * time.Second
+		backoffStrategy.MaxInterval = 10 * time.Second
+		err := backoff.RetryNotify(trySendDfu, backoffStrategy, func(e error, d time.Duration) {
+			onProgress(fmt.Sprintf("%v\nRetrying in %v", e, d))
+		})
+
 		if err != nil {
 			// Log the failure, but continue anyway, as the Senso might have been left in
 			// bootloader mode when a previous update process failed. Not all versions of
