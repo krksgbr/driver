@@ -4,7 +4,7 @@ mkShell {
 
   buildInputs = [
 
-    go_1_12
+    go
     gcc
     nix-prefetch-git
 
