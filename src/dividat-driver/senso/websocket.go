@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/grandcat/zeroconf"
+	"github.com/libp2p/zeroconf/v2"
 	"github.com/sirupsen/logrus"
 )
 

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grandcat/zeroconf"
+	"github.com/libp2p/zeroconf/v2"
 	"github.com/pin/tftp"
 )
 
@@ -194,21 +194,14 @@ func putTFTP(host string, port string, image io.Reader, onProgress OnProgress) e
 }
 
 func discover(service string, deviceSerial *string, ctx context.Context, onProgress OnProgress) (addr string, err error) {
-	resolver, err := zeroconf.NewResolver(nil)
-	if err != nil {
-		err = fmt.Errorf("Initializing discovery failed: %v", err)
-		return
-	}
-
 	onProgress(fmt.Sprintf("Starting discovery: %s", service))
 
 	entries := make(chan *zeroconf.ServiceEntry)
 
-	err = resolver.Browse(ctx, service, "local.", entries)
-	if err != nil {
-		err = fmt.Errorf("Browsing failed: %v", err)
-		return
-	}
+	go func() {
+		browseErr := zeroconf.Browse(ctx, service, "local.", entries)
+		onProgress(fmt.Sprintf("Failed to initialize browsing %v", browseErr))
+	}()
 
 	devices := make(map[string][]string)
 	entriesWithoutSerial := 0
