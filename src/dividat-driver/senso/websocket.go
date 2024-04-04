@@ -265,12 +265,13 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			if handle.isUpdatingFirmware() {
-				handle.log.Info("Firmware update in progress, ignoring websocket message.")
-				continue
-			}
-
 			if messageType == websocket.BinaryMessage {
+
+				if handle.isUpdatingFirmware() {
+					handle.log.Info("Firmware update in progress, ignoring Senso command.")
+					continue
+				}
+
 				handle.broker.TryPub(msg, "tx")
 
 			} else if messageType == websocket.TextMessage {
@@ -282,6 +283,11 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				log.WithField("command", prettyPrintCommand(command)).Debug("Received command.")
+
+				if handle.isUpdatingFirmware() && (command.GetStatus == nil || command.Discover == nil) {
+					handle.log.Info("Firmware update in progress, ignoring UpdateFirmware command.")
+					continue
+				}
 
 				err := handle.dispatchCommand(ctx, log, command, sendMessage)
 				if err != nil {
