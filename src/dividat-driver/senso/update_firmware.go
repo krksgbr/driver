@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/dividat/driver/src/dividat-driver/firmware"
 )
@@ -29,11 +30,16 @@ func (handle *Handle) setUpdatingFirmware(state bool) {
 func (handle *Handle) ProcessFirmwareUpdateRequest(command UpdateFirmware, onUpdate OnUpdate) {
 	handle.log.Info("Processing firmware update request.")
 	handle.setUpdatingFirmware(true)
+
+	onProgress := func(progressMsg string) {
+		onUpdate(FirmwareUpdateMessage{FirmwareUpdateProgress: &progressMsg})
+	}
+
 	if handle.cancelCurrentConnection != nil {
-		msg := "Disconnecting from the Senso"
-		onUpdate(FirmwareUpdateMessage{FirmwareUpdateProgress: &msg})
+		onProgress("Disconnecting from the Senso")
 		handle.cancelCurrentConnection()
 	}
+
 	image, err := decodeImage(command.Image)
 	if err != nil {
 		msg := fmt.Sprintf("Error decoding base64 string: %v", err)
@@ -41,10 +47,9 @@ func (handle *Handle) ProcessFirmwareUpdateRequest(command UpdateFirmware, onUpd
 		handle.log.Error(msg)
 	}
 
-	onProgress := func(progressMsg string) {
-		onUpdate(FirmwareUpdateMessage{FirmwareUpdateProgress: &progressMsg})
-	}
 
+	onProgress("Waiting 10 seconds for connection teardown")
+	time.Sleep(10 * time.Second)
 	err = firmware.Update(context.Background(), image, nil, &command.Address, onProgress)
 	if err != nil {
 		failureMsg := fmt.Sprintf("Failed to update firmware: %v", err)
