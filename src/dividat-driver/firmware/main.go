@@ -239,10 +239,9 @@ func discover(service string, deviceSerial *string, ctx context.Context, onProgr
 
 	devices := make(map[string][]string)
 	entriesWithoutSerial := 0
-	select {
-	case entry := <-entries:
+	for entry := range entries {
 		if entry == nil {
-			break
+			continue
 		}
 
 		var serial string
@@ -255,14 +254,20 @@ func discover(service string, deviceSerial *string, ctx context.Context, onProgr
 				serial = fmt.Sprintf("UNKNOWN-%d", entriesWithoutSerial)
 			}
 		}
-		if deviceSerial != nil && serial != *deviceSerial {
-			break
+		isMatchingSerial := deviceSerial != nil && serial == *deviceSerial
+		if !isMatchingSerial {
+			continue
 		}
 		for _, addrCandidate := range entry.AddrIPv4 {
 			if addrCandidate.String() == "0.0.0.0" {
 				onProgress(fmt.Sprintf("Skipping discovered address 0.0.0.0 for %s.", serial))
 			} else {
-				devices[serial] = append(devices[serial], addrCandidate.String())
+				serviceAddr := addrCandidate.String()
+				if isMatchingSerial {
+					return serviceAddr, nil
+				} else {
+					devices[serial] = append(devices[serial], serviceAddr)
+				}
 			}
 		}
 	}
