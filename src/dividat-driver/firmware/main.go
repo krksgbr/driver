@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
 	"strings"
@@ -181,6 +182,22 @@ func putTFTP(host string, port string, image io.Reader, onProgress OnProgress) e
 	if err != nil {
 		return fmt.Errorf("Could not create tftp client: %v", err)
 	}
+
+	maxRetries := 5
+	client.SetRetries(maxRetries)
+
+	expDelay := func(attempt int) time.Duration {
+		exp := math.Pow(2, float64(attempt))
+		exp = math.Min(exp, 60)
+		return time.Duration(int(exp)) * time.Second
+	}
+
+	client.SetBackoff(func(attempt int) time.Duration {
+		a1 := attempt + 1
+		msg := fmt.Sprintf("Failed on attempt %d, retrying in %v", a1, expDelay(a1))
+		onProgress(msg)
+		return expDelay(attempt)
+	})
 	rf, err := client.Send("controller-app.bin", "octet")
 	if err != nil {
 		return fmt.Errorf("Could not create send connection: %v", err)
