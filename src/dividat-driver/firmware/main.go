@@ -10,12 +10,12 @@ import (
 	"math"
 	"net"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/libp2p/zeroconf/v2"
 	"github.com/pin/tftp"
+
+	"github.com/dividat/driver/src/dividat-driver/service"
 )
 
 const tftpPort = "69"
@@ -51,40 +51,50 @@ func Command(flags []string) {
 	err = Update(context.Background(), file, deviceSerial, configuredAddr, onProgress)
 
 	if err != nil {
-		fmt.Println(err.Error())
 		fmt.Println()
-		fmt.Println("Update failed. Try turning the Senso off and on, waiting for 30 seconds and then running this update tool again.")
+		fmt.Printf("Update failed: %v \n", err)
 		os.Exit(1)
 	}
 }
 
 type OnProgress func(msg string)
 
-// Firmware update workhorse
-func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string, onProgress OnProgress) (fail error) {
-	// 1: Find address of a Senso in normal mode
-	var controllerHost string
+const tryPowerCycling = "Try turning the Senso off and on, waiting for 30 seconds and then running this update tool again."
+
+func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string, onProgress OnProgress) error {
+	var target service.Service
+
 	if configuredAddr != nil && *configuredAddr != "" {
-		// Use specified controller address
-		controllerHost = *configuredAddr
-		onProgress(fmt.Sprintf("Using specified controller address '%s'.", controllerHost))
+		onProgress(fmt.Sprintf("Using specified address %s", *configuredAddr))
+		match := service.Find(parentCtx, 15*time.Second, service.AddressFilter(*configuredAddr))
+		if match == nil {
+			return fmt.Errorf("Failed to find Senso with address %s.\n%s", *configuredAddr, tryPowerCycling)
+		}
+		target = *match
+	} else if deviceSerial != nil && *deviceSerial != "" {
+		onProgress(fmt.Sprintf("Using specified serial %s", *deviceSerial))
+		match := service.Find(parentCtx, 15*time.Second, service.SerialNumberFilter(*deviceSerial))
+		if match == nil {
+			return fmt.Errorf("Failed to find Senso with serial number %s.\n%s", *configuredAddr, tryPowerCycling)
+		}
+		target = *match
 	} else {
 		// Discover controller address via mDNS
-		ctx, cancel := context.WithTimeout(parentCtx, 15*time.Second)
-		discoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx, onProgress)
-		cancel()
-		if err != nil {
-			onProgress(fmt.Sprintf("Error: %s", err))
+		onProgress("Discovering sensos")
+		services := service.List(parentCtx, 15*time.Second)
+		if len(services) == 1 {
+			target = services[0]
+			onProgress(fmt.Sprintf("Discovered Senso: %s (%s)", target.Text.Serial, target.Address))
+		} else if len(services) == 0 {
+			return fmt.Errorf("Could not find any Sensos.\n%s", tryPowerCycling)
 		} else {
-			controllerHost = discoveredAddr
+			return fmt.Errorf("discovered multiple Sensos: %v, please specify a serial or IP", services)
 		}
 	}
 
-	// 2: Switch the Senso to bootloader mode
-	if controllerHost != "" {
-
+	if !service.IsDfuService(target) {
 		trySendDfu := func() error {
-			err := sendDfuCommand(controllerHost, controllerPort, onProgress)
+			err := sendDfuCommand(target.Address, controllerPort, onProgress)
 			return err
 		}
 
@@ -96,63 +106,34 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 		})
 
 		if err != nil {
-			// Log the failure, but continue anyway, as the Senso might have been left in
-			// bootloader mode when a previous update process failed. Not all versions of
-			// the firmware automtically exit from the bootloader mode upon restart.
-			onProgress(fmt.Sprintf("Could not send DFU command to Senso at %s: %s", controllerHost, err))
+			return fmt.Errorf("could not send DFU command to Senso at %s: %s", target.Address, err)
 		}
+
+		onProgress("Looking for senso in bootloader mode")
+		dfuService := service.Find(parentCtx, 30*time.Second, func(discovered service.Service) bool {
+			return service.SerialNumberFilter(target.Text.Serial)(discovered) && service.IsDfuService(discovered)
+		})
+
+		if dfuService == nil {
+			return fmt.Errorf("Could not rediscover Senso in bootloader mode.\n%s", tryPowerCycling)
+		}
+
+		target = *dfuService
+		onProgress(fmt.Sprintf("Re-discovered Senso in bootloader mode at %s", target.Address))
+		onProgress("Waiting 15 seconds to ensure proper TFTP startup")
+		// Wait to ensure proper TFTP startup
+		time.Sleep(15 * time.Second)
 	} else {
-		onProgress("Could not discover a Senso in regular mode, now trying to detect a Senso already in bootloader mode.")
+		onProgress("Senso discovered in bootloader mode")
 	}
 
-	// 3: Find address of Senso in bootloader mode
-	var dfuHost string
-	if configuredAddr != nil && *configuredAddr != "" {
-		dfuHost = *configuredAddr
-	} else {
-		ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
-		onProgress("Looking for Senso in bootloader mode.")
-		discoveredAddr, err := discover("_sensoUpdate._udp", deviceSerial, ctx, onProgress)
-		cancel()
-		if err != nil {
-			// Up to firmware 2.0.0.0 the bootloader advertised itself with the same
-			// service identifier as the application level firmware. To support such
-			// legacy devices, we look for `_sensoControl` again at this point, if
-			// the other service has not been found.
-			// We do need to rediscover, as the legacy device may still just have
-			// restarted into the bootloader and obtained a new IP address.
-			ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
-			legacyDiscoveredAddr, err := discover("_sensoControl._tcp", deviceSerial, ctx, onProgress)
-			cancel()
-			if err == nil {
-				dfuHost = legacyDiscoveredAddr
-				onProgress("Senso discovered via _sensoControl._tcp")
-			} else if controllerHost != "" {
-				onProgress(fmt.Sprintf("Could not discover update service, trying to fall back to previous discovery %s.", controllerHost))
-				dfuHost = controllerHost
-			} else {
-				msg := fmt.Sprintf("Could not find any Senso bootloader to transmit firmware to: %s", err)
-				onProgress(msg)
-				fail = fmt.Errorf(msg)
-				return
-			}
-		} else {
-			dfuHost = discoveredAddr
-			onProgress("Senso discovered via _sensoUpdate._udp")
-		}
-	}
-
-	onProgress("Waiting 15 seconds to ensure proper TFTP startup")
-	// 4: Transmit firmware via TFTP
-	time.Sleep(15 * time.Second) // Wait to ensure proper TFTP startup
-	err := putTFTP(dfuHost, tftpPort, image, onProgress)
+	err := putTFTP(target.Address, tftpPort, image, onProgress)
 	if err != nil {
-		fail = err
-		return
+		return err
 	}
 
 	onProgress("Success! Firmware transmitted to Senso.")
-	return
+	return nil
 }
 
 func sendDfuCommand(host string, port string, onProgress OnProgress) error {
@@ -225,75 +206,4 @@ func putTFTP(host string, port string, image io.Reader, onProgress OnProgress) e
 	}
 	onProgress(fmt.Sprintf("%d bytes sent", n))
 	return nil
-}
-
-func discover(service string, deviceSerial *string, ctx context.Context, onProgress OnProgress) (addr string, err error) {
-	onProgress(fmt.Sprintf("Starting discovery: %s", service))
-
-	entries := make(chan *zeroconf.ServiceEntry)
-
-	go func() {
-		browseErr := zeroconf.Browse(ctx, service, "local.", entries)
-		onProgress(fmt.Sprintf("Failed to initialize browsing %v", browseErr))
-	}()
-
-	devices := make(map[string][]string)
-	entriesWithoutSerial := 0
-	for entry := range entries {
-		if entry == nil {
-			continue
-		}
-
-		var serial string
-		for ix, txt := range entry.Text {
-			if strings.HasPrefix(txt, "ser_no=") {
-				serial = cleanSerial(strings.TrimPrefix(txt, "ser_no="))
-				break
-			} else if ix == len(entry.Text)-1 {
-				entriesWithoutSerial++
-				serial = fmt.Sprintf("UNKNOWN-%d", entriesWithoutSerial)
-			}
-		}
-		isMatchingSerial := deviceSerial != nil && serial == *deviceSerial
-		if !isMatchingSerial {
-			continue
-		}
-		for _, addrCandidate := range entry.AddrIPv4 {
-			if addrCandidate.String() == "0.0.0.0" {
-				onProgress(fmt.Sprintf("Skipping discovered address 0.0.0.0 for %s.", serial))
-			} else {
-				serviceAddr := addrCandidate.String()
-				if isMatchingSerial {
-					return serviceAddr, nil
-				} else {
-					devices[serial] = append(devices[serial], serviceAddr)
-				}
-			}
-		}
-	}
-
-	if len(devices) == 0 && deviceSerial == nil {
-		err = fmt.Errorf("Could not find any devices for service %s.", service)
-	} else if len(devices) == 0 && deviceSerial != nil {
-		err = fmt.Errorf("Could not find Senso %s.", *deviceSerial)
-	} else if len(devices) == 1 {
-		for serial, addrs := range devices {
-			addr = addrs[0]
-			onProgress(fmt.Sprintf("Discovered %s at %v, using %s.", serial, addrs, addr))
-			return
-		}
-	} else {
-		err = fmt.Errorf("Discovered multiple Sensos: %v. Please specify a serial or IP.", devices)
-		return
-	}
-	return
-}
-
-func cleanSerial(serialStr string) string {
-	// Senso firmware up to 3.8.0 adds garbage at end of serial in mDNS
-	// entries due to improper string sizing.  Because bootloader firmware
-	// will not be updated via Ethernet, the problem will stay around for a
-	// while and we clean up the serial here to produce readable output for
-	// older devices.
-	return strings.Split(serialStr, "\\000")[0]
 }

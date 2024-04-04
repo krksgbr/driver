@@ -12,6 +12,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/libp2p/zeroconf/v2"
 	"github.com/sirupsen/logrus"
+
+	"github.com/dividat/driver/src/dividat-driver/service"
 )
 
 // WEBSOCKET PROTOCOL
@@ -329,14 +331,14 @@ func (handle *Handle) dispatchCommand(ctx context.Context, log *logrus.Entry, co
 
 		discoveryCtx, _ := context.WithTimeout(ctx, time.Duration(command.Discover.Duration)*time.Second)
 
-		entries := handle.Discover(discoveryCtx)
+		entries := service.Scan(discoveryCtx)
 
-		go func(entries chan *zeroconf.ServiceEntry) {
+		go func(entries chan service.Service) {
 			for entry := range entries {
 				log.WithField("service", entry).Debug("Discovered service.")
 
 				var message Message
-				message.Discovered = entry
+				message.Discovered = &entry.ServiceEntry
 
 				err := sendMessage(message)
 				if err != nil {
@@ -350,7 +352,7 @@ func (handle *Handle) dispatchCommand(ctx context.Context, log *logrus.Entry, co
 		return nil
 
 	} else if command.UpdateFirmware != nil {
-		go func(){
+		go func() {
 			handle.ProcessFirmwareUpdateRequest(*command.UpdateFirmware, func(msg FirmwareUpdateMessage) {
 				sendMessage(Message{
 					FirmwareUpdateMessage: &msg,
