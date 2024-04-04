@@ -97,6 +97,7 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 		dfuHost = *configuredAddr
 	} else {
 		ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
+		onProgress("Looking for Senso in bootloader mode.")
 		discoveredAddr, err := discover("_sensoUpdate._udp", deviceSerial, ctx, onProgress)
 		cancel()
 		if err != nil {
@@ -111,6 +112,7 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 			cancel()
 			if err == nil {
 				dfuHost = legacyDiscoveredAddr
+				onProgress("Senso discovered via _sensoControl._tcp")
 			} else if controllerHost != "" {
 				onProgress(fmt.Sprintf("Could not discover update service, trying to fall back to previous discovery %s.", controllerHost))
 				dfuHost = controllerHost
@@ -122,9 +124,11 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 			}
 		} else {
 			dfuHost = discoveredAddr
+			onProgress("Senso discovered via _sensoUpdate._udp")
 		}
 	}
 
+	onProgress("Preparing to transmit firmware.")
 	// 4: Transmit firmware via TFTP
 	time.Sleep(5 * time.Second) // Wait to ensure proper TFTP startup
 	err := putTFTP(dfuHost, tftpPort, image, onProgress)

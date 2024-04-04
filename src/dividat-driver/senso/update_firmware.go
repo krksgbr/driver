@@ -30,6 +30,8 @@ func (handle *Handle) ProcessFirmwareUpdateRequest(command UpdateFirmware, onUpd
 	handle.log.Info("Processing firmware update request.")
 	handle.setUpdatingFirmware(true)
 	if handle.cancelCurrentConnection != nil {
+		msg := "Disconnecting from the Senso"
+		onUpdate(FirmwareUpdateMessage{FirmwareUpdateProgress: &msg})
 		handle.cancelCurrentConnection()
 	}
 	image, err := decodeImage(command.Image)
