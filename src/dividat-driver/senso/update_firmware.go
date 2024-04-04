@@ -47,10 +47,9 @@ func (handle *Handle) ProcessFirmwareUpdateRequest(command UpdateFirmware, onUpd
 		handle.log.Error(msg)
 	}
 
-
 	onProgress("Waiting 10 seconds for connection teardown")
 	time.Sleep(10 * time.Second)
-	err = firmware.Update(context.Background(), image, &command.SerialNumber, nil, onProgress)
+	err = firmware.UpdateBySerial(context.Background(), command.SerialNumber, image, onProgress)
 	if err != nil {
 		failureMsg := fmt.Sprintf("Failed to update firmware: %v", err)
 		onUpdate(FirmwareUpdateMessage{FirmwareUpdateFailure: &failureMsg})

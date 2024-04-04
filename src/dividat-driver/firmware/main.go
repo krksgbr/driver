@@ -29,11 +29,6 @@ func Command(flags []string) {
 	sensoSerial := updateFlags.String("s", "", "Senso serial (optional)")
 	updateFlags.Parse(flags)
 
-	var deviceSerial *string = nil
-	if *sensoSerial != "" {
-		deviceSerial = sensoSerial
-	}
-
 	if *imagePath == "" {
 		flag.PrintDefaults()
 		return
@@ -48,7 +43,13 @@ func Command(flags []string) {
 		fmt.Println(progressMsg)
 	}
 
-	err = Update(context.Background(), file, deviceSerial, configuredAddr, onProgress)
+	if *sensoSerial != "" {
+		err = UpdateBySerial(context.Background(), *sensoSerial, file, onProgress)
+	} else if *configuredAddr != "" {
+		err = updateByAddress(context.Background(), *configuredAddr, file, onProgress)
+	} else {
+		err = updateByDiscovery(context.Background(), file, onProgress)
+	}
 
 	if err != nil {
 		fmt.Println()
@@ -61,37 +62,42 @@ type OnProgress func(msg string)
 
 const tryPowerCycling = "Try turning the Senso off and on, waiting for 30 seconds and then running this update tool again."
 
-func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string, onProgress OnProgress) error {
-	var target service.Service
-
-	if configuredAddr != nil && *configuredAddr != "" {
-		onProgress(fmt.Sprintf("Using specified address %s", *configuredAddr))
-		match := service.Find(parentCtx, 15*time.Second, service.AddressFilter(*configuredAddr))
-		if match == nil {
-			return fmt.Errorf("Failed to find Senso with address %s.\n%s", *configuredAddr, tryPowerCycling)
-		}
-		target = *match
-	} else if deviceSerial != nil && *deviceSerial != "" {
-		onProgress(fmt.Sprintf("Using specified serial %s", *deviceSerial))
-		match := service.Find(parentCtx, 15*time.Second, service.SerialNumberFilter(*deviceSerial))
-		if match == nil {
-			return fmt.Errorf("Failed to find Senso with serial number %s.\n%s", *configuredAddr, tryPowerCycling)
-		}
-		target = *match
-	} else {
-		// Discover controller address via mDNS
-		onProgress("Discovering sensos")
-		services := service.List(parentCtx, 15*time.Second)
-		if len(services) == 1 {
-			target = services[0]
-			onProgress(fmt.Sprintf("Discovered Senso: %s (%s)", target.Text.Serial, target.Address))
-		} else if len(services) == 0 {
-			return fmt.Errorf("Could not find any Sensos.\n%s", tryPowerCycling)
-		} else {
-			return fmt.Errorf("discovered multiple Sensos: %v, please specify a serial or IP", services)
-		}
+func UpdateBySerial(ctx context.Context, deviceSerial string, image io.Reader, onProgress OnProgress) error {
+	onProgress(fmt.Sprintf("Using specified serial %s", deviceSerial))
+	match := service.Find(ctx, 15*time.Second, service.SerialNumberFilter(deviceSerial))
+	if match == nil {
+		return fmt.Errorf("Failed to find Senso with serial number %s.\n%s", deviceSerial, tryPowerCycling)
 	}
 
+	onProgress(fmt.Sprintf("Discovered Senso at %s", match.Address))
+	return update(ctx, *match, image, onProgress)
+}
+
+func updateByAddress(ctx context.Context, address string, image io.Reader, onProgress OnProgress) error {
+	onProgress(fmt.Sprintf("Using specified address %s", address))
+	match := service.Find(ctx, 15*time.Second, service.AddressFilter(address))
+	if match == nil {
+		return fmt.Errorf("Failed to find Senso with address %s.\n%s", address, tryPowerCycling)
+	}
+
+	return update(ctx, *match, image, onProgress)
+}
+
+func updateByDiscovery(ctx context.Context, image io.Reader, onProgress OnProgress) error {
+	onProgress("Discovering sensos")
+	services := service.List(ctx, 15*time.Second)
+	if len(services) == 1 {
+		target := services[0]
+		onProgress(fmt.Sprintf("Discovered Senso: %s (%s)", target.Text.Serial, target.Address))
+		return update(ctx, target, image, onProgress)
+	} else if len(services) == 0 {
+		return fmt.Errorf("Could not find any Sensos.\n%s", tryPowerCycling)
+	} else {
+		return fmt.Errorf("discovered multiple Sensos: %v, please specify a serial or IP", services)
+	}
+}
+
+func update(parentCtx context.Context, target service.Service, image io.Reader, onProgress OnProgress) error {
 	if !service.IsDfuService(target) {
 		trySendDfu := func() error {
 			err := sendDfuCommand(target.Address, controllerPort, onProgress)
