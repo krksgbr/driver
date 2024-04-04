@@ -46,7 +46,7 @@ func Command(flags []string) {
 		fmt.Println(progressMsg)
 	}
 
-	Update(context.Background(), file, deviceSerial, configuredAddr, onProgress)
+	err = Update(context.Background(), file, deviceSerial, configuredAddr, onProgress)
 
 	if err != nil {
 		fmt.Println(err.Error())
