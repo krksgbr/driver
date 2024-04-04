@@ -129,9 +129,9 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 		}
 	}
 
-	onProgress("Waiting 5 seconds to ensure proper TFTP startup")
+	onProgress("Waiting 15 seconds to ensure proper TFTP startup")
 	// 4: Transmit firmware via TFTP
-	time.Sleep(5 * time.Second) // Wait to ensure proper TFTP startup
+	time.Sleep(15 * time.Second) // Wait to ensure proper TFTP startup
 	err := putTFTP(dfuHost, tftpPort, image, onProgress)
 	if err != nil {
 		fail = err
