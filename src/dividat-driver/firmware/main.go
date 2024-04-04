@@ -63,7 +63,7 @@ type OnProgress func(msg string)
 func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, configuredAddr *string, onProgress OnProgress) (fail error) {
 	// 1: Find address of a Senso in normal mode
 	var controllerHost string
-	if *configuredAddr != "" {
+	if configuredAddr != nil && *configuredAddr != "" {
 		// Use specified controller address
 		controllerHost = *configuredAddr
 		onProgress(fmt.Sprintf("Using specified controller address '%s'.", controllerHost))
@@ -94,7 +94,7 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 
 	// 3: Find address of Senso in bootloader mode
 	var dfuHost string
-	if *configuredAddr != "" {
+	if configuredAddr != nil && *configuredAddr != "" {
 		dfuHost = *configuredAddr
 	} else {
 		ctx, cancel := context.WithTimeout(parentCtx, 60*time.Second)
