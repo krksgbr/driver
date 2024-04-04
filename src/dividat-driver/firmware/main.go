@@ -129,7 +129,7 @@ func Update(parentCtx context.Context, image io.Reader, deviceSerial *string, co
 		}
 	}
 
-	onProgress("Preparing to transmit firmware.")
+	onProgress("Waiting 5 seconds to ensure proper TFTP startup")
 	// 4: Transmit firmware via TFTP
 	time.Sleep(5 * time.Second) // Wait to ensure proper TFTP startup
 	err := putTFTP(dfuHost, tftpPort, image, onProgress)
@@ -178,6 +178,7 @@ func sendDfuCommand(host string, port string, onProgress OnProgress) error {
 }
 
 func putTFTP(host string, port string, image io.Reader, onProgress OnProgress) error {
+	onProgress("Creating TFTP client")
 	client, err := tftp.NewClient(fmt.Sprintf("%s:%s", host, port))
 	if err != nil {
 		return fmt.Errorf("Could not create tftp client: %v", err)
@@ -198,10 +199,13 @@ func putTFTP(host string, port string, image io.Reader, onProgress OnProgress) e
 		onProgress(msg)
 		return expDelay(attempt)
 	})
+
+	onProgress("Preparing transmission")
 	rf, err := client.Send("controller-app.bin", "octet")
 	if err != nil {
 		return fmt.Errorf("Could not create send connection: %v", err)
 	}
+	onProgress("Transmitting...")
 	n, err := rf.ReadFrom(image)
 	if err != nil {
 		return fmt.Errorf("Could not read from file: %v", err)
