@@ -17,30 +17,20 @@ SRC = ./src/dividat-driver/main.go
 # Default location where built binary will be placed
 OUT ?= bin/dividat-driver
 
-# Get version from git
-VERSION := $(shell git describe --always HEAD)
-
 # Only channel is main now
 CHANNEL := main
-
-CC ?= gcc
-CXX ?= g++
-
-# Enable static linking
-ifdef STATIC_BUILD
-	STATIC_LINKING_LDFLAGS := -linkmode external -extldflags \"-static\"
-endif
-
-GO_LDFLAGS = -ldflags "$(STATIC_LINKING_LDFLAGS) \
-						 -X github.com/dividat/driver/src/dividat-driver/server.version=$(VERSION)"
 
 CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 
 
 ### Simple build ##########################################
+DEV_VERSION := $(shell git describe --always HEAD)
 .PHONY: build
 build:
-	$(GOCROSS_OPTS) CC=$(CC) CXX=$(CXX) go build $(GO_LDFLAGS) -o $(OUT) $(SRC)
+	CC=gcc CXX=g++ \
+		 go build \
+		 -ldflags  "-X github.com/dividat/driver/src/dividat-driver/server.version=$(DEV_VERSION)" \
+		 -o $(OUT) $(SRC)
 
 
 ### Test suite ############################################
@@ -65,16 +55,31 @@ record:
 record-flex:
 	@go run src/dividat-driver/recorder/main.go ws://localhost:8382/flex
 
+.PHONY: bin
+bin:
+	mkdir -p bin
+
+
+VERSION := $(shell git describe --tags --abbrev=0)
+
+.PHONY: VERSION
+VERSION:
+	echo $(VERSION) > VERSION
+
 ### Cross compilation #####################################
 LINUX_BIN = bin/dividat-driver-linux-amd64
 .PHONY: $(LINUX_BIN)
-$(LINUX_BIN):
-	nix-shell nix/build/linux.nix --command "$(MAKE) OUT=$(LINUX_BIN) STATIC_BUILD=1 GOCROSS_OPTS=\"GOOS=linux GOARCH=amd64\""
+$(LINUX_BIN): bin VERSION
+	nix build '.#dividat-driver.x86_64-linux'
+	install -m 755 result/bin/dividat-driver $(LINUX_BIN)
+	rm result
 
 WINDOWS_BIN = bin/dividat-driver-windows-amd64.exe
 .PHONY: $(WINDOWS_BIN)
-$(WINDOWS_BIN):
-	nix-shell nix/build/windows.nix --command "$(MAKE) OUT=$(WINDOWS_BIN) STATIC_BUILD=1 GOCROSS_OPTS=\"GOOS=windows GOARCH=amd64\""
+$(WINDOWS_BIN): bin VERSION
+	nix build '.#dividat-driver.x86_64-windows'
+	install -m 755 result/bin/dividat-driver.exe $(WINDOWS_BIN)
+	rm result
 
 crossbuild: $(LINUX_BIN) $(WINDOWS_BIN)
 
