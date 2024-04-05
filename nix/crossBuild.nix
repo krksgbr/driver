@@ -14,9 +14,10 @@ buildGoModule ({
   version = version;
   vendorHash = "sha256-S8qJorySFPERNp4i9ckeZCPLyx0d/QweS4hm4ghJT4k=";
   ldflags = [
+    "-X github.com/dividat/driver/src/dividat-driver/server.version=${version}"
+  ] ++ lib.optionals (!stdenv.targetPlatform.isDarwin) [
     "-linkmode external"
     "-extldflags '-static'"
-    "-X github.com/dividat/driver/src/dividat-driver/server.version=${version}"
   ];
   nativeBuildInputs = lib.optionals stdenv.targetPlatform.isLinux [ pkg-config ];
   buildInputs = lib.optionals stdenv.targetPlatform.isLinux [ static-pcsclite ]
