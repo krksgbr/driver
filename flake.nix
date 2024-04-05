@@ -1,9 +1,7 @@
 {
   description = "Cross compile dividat driver";
   inputs = {
-    nixpkgs.url =
-      # Snapshot from https://github.com/nixos/nixpkgs/tree/nixos-23.05 on 2023 Sep 7
-      "github:nixos/nixpkgs/4077a0e4ac3356222bc1f0a070af7939c3098535";
+    nixpkgs.url = "github:nixos/nixpkgs/23.11";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
