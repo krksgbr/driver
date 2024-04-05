@@ -27,9 +27,10 @@ CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 DEV_VERSION := $(shell git describe --always HEAD)
 .PHONY: build
 build:
-		 go build \
+		 @go build \
 		 -ldflags  "-X github.com/dividat/driver/src/dividat-driver/server.version=$(DEV_VERSION)" \
 		 -o $(OUT) $(SRC)
+		 @echo "Built $(OUT)" 
 
 
 ### Test suite ############################################
