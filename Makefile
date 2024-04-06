@@ -152,11 +152,6 @@ deploy: release
 		--acl public-read \
 		--cache-control max-age=0
 
-
-### Dependencies and cleanup ##############################
-nix/deps.nix: src/dividat-driver/Gopkg.toml
-	dep2nix -i src/dividat-driver/Gopkg.lock -o nix/deps.nix
-
 clean:
 	rm -rf release/
 	rm -rf bin/
