@@ -1,5 +1,8 @@
 {
-  description = "Cross compile dividat driver";
+  description = ''
+  Provides cross-compiled binaries of Dividat driver for Windows and Linux,
+  and a development shell for Linux and macOS.
+  '';
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/23.11";
     flake-utils.url = "github:numtide/flake-utils";
