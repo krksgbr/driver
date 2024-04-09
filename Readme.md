@@ -12,7 +12,7 @@ Dividat drivers and hardware test suites.
 
 ### Quick start
 
-- Create a suitable environment: `nix-shell`
+- Enter the nix development shell: `nix develop`
 - Build the driver: `make`
 - Run the driver: `./bin/dividat-driver`
 
@@ -34,14 +34,27 @@ Documentation is available at https://golang.org/ref/mod.
 
 To create a release run: `make release`.
 
-A default environment (defined in `default.nix`) provides all necessary dependencies for building on your native system (i.e. Linux or Darwin). Running `make` will create a binary that should run on your system (at least in the default environemnt).
+A default nix shell (defined in `nix/devShell.nix`) provides all necessary dependencies for building on your native system (i.e. Linux or Darwin). Running `make` will create a binary that should run on your system (at least in the default environemnt).
 
-Releases are built towards a more clearly specified target system (also statically linked). The target systems are defined in the [`nix/build`](nix/build) folder. Nix provides toolchains and dependencies for the target system in a sub environment. The build system (in the `make crossbuild` target) invokes these sub environments to build releases.
+Releases are built as statically linked binaries for windows and linux using the cross compilation toolchain provided by nix. The toolchain is provided by nix shells defined in [crossBuild.nix](nix/crossBuild.nix). Building the binaries can be done by running `make crossbuild` from the default shell.
 
 Existing release targets:
 
-- Linux: statically linked with [musl](https://www.musl-libc.org/)
-- Windows
+- Linux: x86_64 (statically linked with [musl](https://www.musl-libc.org/))
+- Windows: x86_64
+
+There are also build shells for macOS binaries, but these are not hooked into `make crossbuild` as currently they only work on macOS.
+To build the macOS binaries:
+
+```sh
+export VERSION=$(git describe --always HEAD)
+
+# Build for aarch64 / arm64 / Apple silicon
+nix develop .\#crossBuild.darwin.aarch64 --command build-driver -v "$VERSION" -i src/dividat-driver/main.go -o ./bin/dividat-driver-darwin-arm64
+
+# Build for x86_64 / amd64 / Intel
+nix develop .\#crossBuild.darwin.x86_64 --command build-driver -v "$VERSION" -i src/dividat-driver/main.go -o ./bin/dividat-driver-darwin-amd64
+```
 
 ### Deploying
 
