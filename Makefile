@@ -27,12 +27,12 @@ CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 
 
 ### Simple build ##########################################
+# The `build-driver` script is provided by the dev shell.
+# See nix/driverBuildScript.nix for details.
 .PHONY: build
 build:
-		 @go build \
-		 -ldflags  "-X github.com/dividat/driver/src/dividat-driver/server.version=$(VERSION)" \
-		 -o $(OUT) $(SRC)
-		 @echo "Built $(OUT)" 
+		@build-driver -i $(SRC) -o $(OUT) -v $(VERSION)
+	 	@echo "Built $(OUT)" 
 
 
 ### Test suite ############################################
