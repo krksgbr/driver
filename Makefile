@@ -20,15 +20,17 @@ OUT ?= bin/dividat-driver
 # Only channel is main now
 CHANNEL := main
 
+VERSION := $(shell git describe --always HEAD)
+
 CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 
 
+
 ### Simple build ##########################################
-DEV_VERSION := $(shell git describe --always HEAD)
 .PHONY: build
 build:
 		 @go build \
-		 -ldflags  "-X github.com/dividat/driver/src/dividat-driver/server.version=$(DEV_VERSION)" \
+		 -ldflags  "-X github.com/dividat/driver/src/dividat-driver/server.version=$(VERSION)" \
 		 -o $(OUT) $(SRC)
 		 @echo "Built $(OUT)" 
 
@@ -60,26 +62,16 @@ bin:
 	mkdir -p bin
 
 
-VERSION := $(shell git describe --tags --abbrev=0)
-
-.PHONY: VERSION
-VERSION:
-	echo $(VERSION) > VERSION
-
 ### Cross compilation #####################################
 LINUX_BIN = bin/dividat-driver-linux-amd64
 .PHONY: $(LINUX_BIN)
-$(LINUX_BIN): bin VERSION
-	nix build '.#dividat-driver.x86_64-linux'
-	install -m 755 result/bin/dividat-driver $(LINUX_BIN)
-	rm result
+$(LINUX_BIN): bin
+	nix develop '.#crossBuild.x86_64-linux' --command build-driver -i $(SRC) -o $(LINUX_BIN) -v $(VERSION) 
 
 WINDOWS_BIN = bin/dividat-driver-windows-amd64.exe
 .PHONY: $(WINDOWS_BIN)
-$(WINDOWS_BIN): bin VERSION
-	nix build '.#dividat-driver.x86_64-windows'
-	install -m 755 result/bin/dividat-driver.exe $(WINDOWS_BIN)
-	rm result
+$(WINDOWS_BIN): bin
+	nix develop '.#crossBuild.x86_64-windows' --command build-driver -i $(SRC) -o $(WINDOWS_BIN) -v $(VERSION) 
 
 crossbuild: $(LINUX_BIN) $(WINDOWS_BIN)
 
