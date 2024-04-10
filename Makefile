@@ -53,20 +53,15 @@ record:
 record-flex:
 	@go run src/dividat-driver/recorder/main.go ws://localhost:8382/flex
 
-.PHONY: bin
-bin:
-	mkdir -p bin
-
-
 ### Cross compilation #####################################
 LINUX_BIN = bin/dividat-driver-linux-amd64
 .PHONY: $(LINUX_BIN)
-$(LINUX_BIN): bin
+$(LINUX_BIN):
 	nix develop '.#crossBuild.x86_64-linux' --command bash -c "VERBOSE=1 ./build.sh -i $(SRC) -o $(LINUX_BIN) -v $(VERSION) "
 
 WINDOWS_BIN = bin/dividat-driver-windows-amd64.exe
 .PHONY: $(WINDOWS_BIN)
-$(WINDOWS_BIN): bin
+$(WINDOWS_BIN):
 	nix develop '.#crossBuild.x86_64-windows' --command bash -c "VERBOSE=1 ./build.sh -i $(SRC) -o $(WINDOWS_BIN) -v $(VERSION)"
 
 crossbuild: $(LINUX_BIN) $(WINDOWS_BIN)
