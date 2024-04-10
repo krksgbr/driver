@@ -25,14 +25,10 @@ VERSION := $(shell git describe --always HEAD)
 CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 
 
-
 ### Simple build ##########################################
-# The `build-driver` script is provided by the dev shell.
-# See nix/driverBuildScript.nix for details.
 .PHONY: build
 build:
-		@build-driver -i $(SRC) -o $(OUT) -v $(VERSION)
-	 	@echo "Built $(OUT)" 
+		@./build.sh -i $(SRC) -o $(OUT) -v $(VERSION)
 
 
 ### Test suite ############################################
@@ -66,12 +62,12 @@ bin:
 LINUX_BIN = bin/dividat-driver-linux-amd64
 .PHONY: $(LINUX_BIN)
 $(LINUX_BIN): bin
-	nix develop '.#crossBuild.x86_64-linux' --command build-driver -i $(SRC) -o $(LINUX_BIN) -v $(VERSION) 
+	nix develop '.#crossBuild.x86_64-linux' --command bash -c "VERBOSE=1 ./build.sh -i $(SRC) -o $(LINUX_BIN) -v $(VERSION) "
 
 WINDOWS_BIN = bin/dividat-driver-windows-amd64.exe
 .PHONY: $(WINDOWS_BIN)
 $(WINDOWS_BIN): bin
-	nix develop '.#crossBuild.x86_64-windows' --command build-driver -i $(SRC) -o $(WINDOWS_BIN) -v $(VERSION) 
+	nix develop '.#crossBuild.x86_64-windows' --command bash -c "VERBOSE=1 ./build.sh -i $(SRC) -o $(WINDOWS_BIN) -v $(VERSION)"
 
 crossbuild: $(LINUX_BIN) $(WINDOWS_BIN)
 

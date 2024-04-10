@@ -10,12 +10,14 @@ let
     }:
     pkgs.mkShell {
       inherit nativeBuildInputs;
-      buildInputs = [
-        pkgs.go
-        (import ./driverBuildScript.nix {
-          inherit pkgs GOOS GOARCH CC staticBuild;
-        })
-      ] ++ buildInputs;
+      shellHook = ''
+        export GOOS=${GOOS}
+        export GOARCH=${GOARCH}
+        export CC=${CC}
+        export STATIC_BUILD=${if staticBuild then "1" else "0"}
+        export CGO_ENABLED="1"
+      '';
+      buildInputs = [ pkgs.go ] ++ buildInputs;
     };
 
 in
