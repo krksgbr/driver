@@ -50,10 +50,10 @@ To build the macOS binaries:
 export VERSION=$(git describe --always HEAD)
 
 # Build for aarch64 / arm64 / Apple silicon
-nix develop .\#crossBuild.darwin.aarch64 --command build-driver -v "$VERSION" -i src/dividat-driver/main.go -o ./bin/dividat-driver-darwin-arm64
+nix develop .\#crossBuild.darwin.aarch64 --command ./build.sh -v "$VERSION" -i src/dividat-driver/main.go -o ./bin/dividat-driver-darwin-arm64
 
 # Build for x86_64 / amd64 / Intel
-nix develop .\#crossBuild.darwin.x86_64 --command build-driver -v "$VERSION" -i src/dividat-driver/main.go -o ./bin/dividat-driver-darwin-amd64
+nix develop .\#crossBuild.darwin.x86_64 --command ./build.sh -v "$VERSION" -i src/dividat-driver/main.go -o ./bin/dividat-driver-darwin-amd64
 ```
 
 ### Deploying
