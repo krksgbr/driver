@@ -1,0 +1,6 @@
+steps:
+  - label: "Test"
+    command: "nix develop --command make test"
+
+  - label: "Cross build"
+    command: "nix develop --command make crossbuild"

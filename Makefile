@@ -17,22 +17,10 @@ SRC = ./src/dividat-driver/main.go
 # Default location where built binary will be placed
 OUT ?= bin/dividat-driver
 
-# Get version from git
-VERSION := $(shell git describe --always HEAD)
-
 # Only channel is main now
 CHANNEL := main
 
-CC ?= gcc
-CXX ?= g++
-
-# Enable static linking
-ifdef STATIC_BUILD
-	STATIC_LINKING_LDFLAGS := -linkmode external -extldflags \"-static\"
-endif
-
-GO_LDFLAGS = -ldflags "$(STATIC_LINKING_LDFLAGS) \
-						 -X github.com/dividat/driver/src/dividat-driver/server.version=$(VERSION)"
+VERSION := $(shell git describe --always HEAD)
 
 CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 
@@ -40,7 +28,7 @@ CHECKSUM_SIGNING_CERT ?= ./keys/checksumsign.private.pem
 ### Simple build ##########################################
 .PHONY: build
 build:
-	$(GOCROSS_OPTS) CC=$(CC) CXX=$(CXX) go build $(GO_LDFLAGS) -o $(OUT) $(SRC)
+		@./build.sh -i $(SRC) -o $(OUT) -v $(VERSION)
 
 
 ### Test suite ############################################
@@ -69,12 +57,12 @@ record-flex:
 LINUX_BIN = bin/dividat-driver-linux-amd64
 .PHONY: $(LINUX_BIN)
 $(LINUX_BIN):
-	nix-shell nix/build/linux.nix --command "$(MAKE) OUT=$(LINUX_BIN) STATIC_BUILD=1 GOCROSS_OPTS=\"GOOS=linux GOARCH=amd64\""
+	nix develop '.#crossBuild.x86_64-linux' --command bash -c "VERBOSE=1 ./build.sh -i $(SRC) -o $(LINUX_BIN) -v $(VERSION) "
 
 WINDOWS_BIN = bin/dividat-driver-windows-amd64.exe
 .PHONY: $(WINDOWS_BIN)
 $(WINDOWS_BIN):
-	nix-shell nix/build/windows.nix --command "$(MAKE) OUT=$(WINDOWS_BIN) STATIC_BUILD=1 GOCROSS_OPTS=\"GOOS=windows GOARCH=amd64\""
+	nix develop '.#crossBuild.x86_64-windows' --command bash -c "VERBOSE=1 ./build.sh -i $(SRC) -o $(WINDOWS_BIN) -v $(VERSION)"
 
 crossbuild: $(LINUX_BIN) $(WINDOWS_BIN)
 
@@ -146,11 +134,6 @@ deploy: release
 	aws s3 cp $(LATEST).sig $(BUCKET)/$(CHANNEL)/latest.sig \
 		--acl public-read \
 		--cache-control max-age=0
-
-
-### Dependencies and cleanup ##############################
-nix/deps.nix: src/dividat-driver/Gopkg.toml
-	dep2nix -i src/dividat-driver/Gopkg.lock -o nix/deps.nix
 
 clean:
 	rm -rf release/
