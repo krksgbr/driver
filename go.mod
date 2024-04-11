@@ -12,5 +12,5 @@ require (
 	github.com/libp2p/zeroconf/v2 v2.2.0
 	github.com/pin/tftp v2.1.0+incompatible
 	github.com/sirupsen/logrus v1.8.1
-	go.bug.st/serial v1.1.3
+	go.bug.st/serial v1.6.1
 )
