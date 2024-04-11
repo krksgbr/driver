@@ -11,7 +11,7 @@ import (
 	"github.com/dividat/driver/src/dividat-driver/service"
 )
 
-// Command-line interface to Update
+// Command-line interface to running a firmware update
 func Command(flags []string) {
 	updateFlags := flag.NewFlagSet("update", flag.ExitOnError)
 	imagePath := updateFlags.String("i", "", "Firmware image path")
@@ -47,6 +47,9 @@ func Command(flags []string) {
 		os.Exit(1)
 	}
 }
+
+// The following functions are only used when updating the firmware via the command line.
+// This is why they are private, and not part of the main module.
 
 func updateByAddress(ctx context.Context, address string, image io.Reader, onProgress OnProgress) error {
 	onProgress(fmt.Sprintf("Using specified address %s", address))

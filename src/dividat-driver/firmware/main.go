@@ -1,5 +1,16 @@
 package firmware
 
+// Functions for performing a firmware update.
+// The update procedure consists of the following high-level steps:
+//
+// 1. Discover Senso via mDNS
+//
+// 2. If the Senso is found to be in application mode,
+//    send a DFU (Device Firmware Update) command
+//    to make the Senso reboot into bootloader mode.
+//
+// 3. Transfer the firmware image via TFTP.
+
 import (
 	"bytes"
 	"context"
