@@ -19,6 +19,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff"
@@ -160,4 +161,32 @@ func putTFTP(host string, port string, image io.Reader, onProgress OnProgress) e
 	}
 	onProgress(fmt.Sprintf("%d bytes sent", n))
 	return nil
+}
+
+// State to keep track of when an update is in progress.
+// This is used by the senso module, but is kept here to
+// ensure privacy of internals.
+
+type Update struct {
+	stateMutex sync.Mutex
+	inProgress bool
+}
+
+func InitialUpdateState() *Update {
+	return &Update{
+		inProgress: false,
+		stateMutex: sync.Mutex{},
+	}
+}
+
+func (u *Update) IsUpdating() bool {
+	u.stateMutex.Lock()
+	defer u.stateMutex.Unlock()
+	return u.inProgress
+}
+
+func (u *Update) SetUpdating(state bool) {
+	u.stateMutex.Lock()
+	defer u.stateMutex.Unlock()
+	u.inProgress = state
 }

@@ -16,24 +16,11 @@ type SendMsg struct {
 	success  func(string)
 }
 
-func (handle *Handle) isUpdatingFirmware() bool {
-	handle.firmwareUpdateMutex.Lock()
-	state := handle.firmwareUpdateInProgress
-	handle.firmwareUpdateMutex.Unlock()
-	return state
-}
-
-func (handle *Handle) setUpdatingFirmware(state bool) {
-	handle.firmwareUpdateMutex.Lock()
-	handle.firmwareUpdateInProgress = state
-	handle.firmwareUpdateMutex.Unlock()
-}
-
 
 // Disconnect from current connection
 func (handle *Handle) ProcessFirmwareUpdateRequest(command UpdateFirmware, send SendMsg) {
 	handle.log.Info("Processing firmware update request.")
-	handle.setUpdatingFirmware(true)
+	handle.firmwareUpdate.SetUpdating(true)
 
 	if handle.cancelCurrentConnection != nil {
 		send.progress("Disconnecting from the Senso")
@@ -55,7 +42,7 @@ func (handle *Handle) ProcessFirmwareUpdateRequest(command UpdateFirmware, send 
 	} else {
 		send.success("Firmware successfully transmitted.")
 	}
-	handle.setUpdatingFirmware(false)
+	handle.firmwareUpdate.SetUpdating(false)
 }
 
 func decodeImage(base64Str string) (io.Reader, error) {
