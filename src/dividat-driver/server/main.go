@@ -29,7 +29,7 @@ func Start(logger *logrus.Logger, origins []string) context.CancelFunc {
 	http.Handle("/log", corsHeaders(origins, logServer))
 
 	baseLog := logger.WithFields(logrus.Fields{
-		"version":        version,
+		"version": version,
 	})
 
 	// Get System information
@@ -128,10 +128,10 @@ func corsHeaders(origins []string, next http.Handler) http.Handler {
 }
 
 func contains(slice []string, candidate string) bool {
-    for _, member := range slice {
-        if member == candidate {
-            return true
-        }
-    }
-    return false
+	for _, member := range slice {
+		if member == candidate {
+			return true
+		}
+	}
+	return false
 }
