@@ -4,3 +4,6 @@ steps:
 
   - label: "Cross build"
     command: "nix develop --command make crossbuild"
+
+  - label: "Formatting"
+    command: 'test -z "$(nix develop --command gofmt -l .)"'

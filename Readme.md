@@ -26,6 +26,12 @@ To install a module, use `go get github.com/owner/repo`.
 
 Documentation is available at https://golang.org/ref/mod.
 
+### Formatting
+
+Normalize formatting with: `make format`.
+
+Code is formatted with `gofmt` and normalized formatting is required for CI to pass.
+
 ### Releasing
 
 #### Building
