@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"time"
 
 	"github.com/dividat/driver/src/dividat-driver/service"
 )
@@ -53,7 +52,7 @@ func Command(flags []string) {
 
 func updateByAddress(ctx context.Context, address string, image io.Reader, onProgress OnProgress) error {
 	onProgress(fmt.Sprintf("Using specified address %s", address))
-	match := service.Find(ctx, 15*time.Second, service.AddressFilter(address))
+	match := service.Find(ctx, discoveryTimeout, service.AddressFilter(address))
 	if match == nil {
 		return fmt.Errorf("Failed to find Senso with address %s.\n%s", address, tryPowerCycling)
 	}
@@ -63,7 +62,7 @@ func updateByAddress(ctx context.Context, address string, image io.Reader, onPro
 
 func updateByDiscovery(ctx context.Context, image io.Reader, onProgress OnProgress) error {
 	onProgress("Discovering sensos")
-	services := service.List(ctx, 15*time.Second)
+	services := service.List(ctx, discoveryTimeout)
 	if len(services) == 1 {
 		target := services[0]
 		onProgress(fmt.Sprintf("Discovered Senso: %s (%s)", target.Text.Serial, target.Address))

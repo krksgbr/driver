@@ -30,6 +30,7 @@ import (
 
 const tftpPort = "69"
 const controllerPort = "55567"
+const discoveryTimeout = 60 * time.Second
 
 type OnProgress func(msg string)
 
@@ -37,7 +38,7 @@ const tryPowerCycling = "Try turning the Senso off and on, waiting for 30 second
 
 func UpdateBySerial(ctx context.Context, deviceSerial string, image io.Reader, onProgress OnProgress) error {
 	onProgress(fmt.Sprintf("Looking for Senso with specified serial %s", deviceSerial))
-	match := service.Find(ctx, 15*time.Second, service.SerialNumberFilter(deviceSerial))
+	match := service.Find(ctx, discoveryTimeout, service.SerialNumberFilter(deviceSerial))
 	if match == nil {
 		return fmt.Errorf("Failed to find Senso with serial number %s.\n%s", deviceSerial, tryPowerCycling)
 	}
@@ -65,7 +66,7 @@ func update(parentCtx context.Context, target service.Service, image io.Reader, 
 		}
 
 		onProgress("Looking for senso in bootloader mode")
-		dfuService := service.Find(parentCtx, 30*time.Second, func(discovered service.Service) bool {
+		dfuService := service.Find(parentCtx, discoveryTimeout, func(discovered service.Service) bool {
 			return service.SerialNumberFilter(target.Text.Serial)(discovered) && service.IsDfuService(discovered)
 		})
 
