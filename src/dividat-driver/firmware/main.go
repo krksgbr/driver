@@ -136,6 +136,10 @@ func putTFTP(host string, port string, image io.Reader, onProgress OnProgress) e
 
 	maxRetries := 5
 	client.SetRetries(maxRetries)
+	// It can take a while for the Senso to respond to the TFTP write request.
+	// Setting timeout to 10 seconds prevents unnecessary messages about failed
+	// send attempts.
+	client.SetTimeout(10 * time.Second)
 
 	expDelay := func(attempt int) time.Duration {
 		exp := math.Pow(2, float64(attempt))
