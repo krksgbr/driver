@@ -60,7 +60,7 @@ func main() {
 }
 
 func parseUrl() url.URL {
-	if (len(os.Args) < 2) {
+	if len(os.Args) < 2 {
 		log.Fatal("Expected the WebSocket URL to record from as a parameter")
 	}
 	u, err := url.Parse(os.Args[1])

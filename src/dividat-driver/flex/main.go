@@ -124,7 +124,8 @@ func scanAndConnectSerial(ctx context.Context, logger *logrus.Entry, tx chan int
 // Check whether a port looks like a potential Flex device.
 //
 // Vendor IDs:
-//   16C0 - Van Ooijen Technische Informatica (Teensy)
+//
+//	16C0 - Van Ooijen Technische Informatica (Teensy)
 func isFlexLike(port *enumerator.PortDetails) bool {
 	vendorId := strings.ToUpper(port.VID)
 
@@ -184,7 +185,7 @@ func connectSerial(ctx context.Context, logger *logrus.Entry, serialName string,
 	// seems more robust to fix the mode in the driver right now.
 	BYTES_PER_SAMPLE := 3 // Row, column and sample value of 8 bit
 	BITDEPTH_8_CMD := []byte{'U', 'L', '\n'}
-        _, err = port.Write(BITDEPTH_8_CMD)
+	_, err = port.Write(BITDEPTH_8_CMD)
 	if err != nil {
 		logger.WithField("error", err).Info("Failed to set bitdepth of 8.")
 		return

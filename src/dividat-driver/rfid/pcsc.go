@@ -81,7 +81,6 @@ func pollSmartCard(ctx context.Context, log *logrus.Entry, onToken func(string),
 
 		go waitForCardActivity(&haveBeenKilled, lostContext, log, scard_ctx, hasPnP, onToken, onReadersChange)
 
-
 		select {
 		case <-lostContext:
 			continue
@@ -113,8 +112,8 @@ func waitForCardActivity(haveBeenKilled *bool, lostContext chan bool, log *logru
 		for _, name := range current {
 			if _, present := knownReaders[name]; !present {
 				knownReaders[name] = ReaderProfile{
-					lastKnownState: scard.StateUnknown,
-					lastKnownToken: nil,
+					lastKnownState:   scard.StateUnknown,
+					lastKnownToken:   nil,
 					consecutiveFails: 0,
 				}
 				log.Info(fmt.Sprintf("Reader became available: '%s'", name))
@@ -254,7 +253,7 @@ type ReaderProfile struct {
 	// PC/SC implementation on Windows can emit multiple distinct states for
 	// a single touch-on. We store detected card IDs to deduplicate token stream
 	// for subscribers.
-	lastKnownToken *string
+	lastKnownToken   *string
 	consecutiveFails int
 }
 
