@@ -61,7 +61,7 @@ func updateByAddress(ctx context.Context, address string, image io.Reader, onPro
 }
 
 func updateByDiscovery(ctx context.Context, image io.Reader, onProgress OnProgress) error {
-	onProgress("Discovering sensos")
+	onProgress("Discovering Sensos")
 	services := service.List(ctx, discoveryTimeout)
 	if len(services) == 1 {
 		target := services[0]

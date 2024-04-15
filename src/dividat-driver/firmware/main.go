@@ -65,7 +65,7 @@ func update(parentCtx context.Context, target service.Service, image io.Reader, 
 			return fmt.Errorf("could not send DFU command to Senso at %s: %s", target.Address, err)
 		}
 
-		onProgress("Looking for senso in bootloader mode")
+		onProgress("Looking for Senso in bootloader mode")
 		dfuService := service.Find(parentCtx, discoveryTimeout, func(discovered service.Service) bool {
 			return service.SerialNumberFilter(target.Text.Serial)(discovered) && service.IsDfuService(discovered)
 		})
