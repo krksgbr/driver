@@ -38,6 +38,12 @@ test: build
 	npm test
 
 
+### Formatting ############################################
+.PHONY: format
+format:
+	gofmt -w src/
+
+
 ### Helper to quickly run the driver
 .PHONY: run
 run: build
