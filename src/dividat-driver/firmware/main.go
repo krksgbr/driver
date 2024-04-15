@@ -76,9 +76,9 @@ func update(parentCtx context.Context, target service.Service, image io.Reader, 
 
 		target = *dfuService
 		onProgress(fmt.Sprintf("Re-discovered Senso in bootloader mode at %s", target.Address))
-		onProgress("Waiting 15 seconds to ensure proper TFTP startup")
+		onProgress("Waiting 10 seconds to ensure proper TFTP startup")
 		// Wait to ensure proper TFTP startup
-		time.Sleep(5 * time.Second)
+		time.Sleep(10 * time.Second)
 	} else {
 		onProgress("Senso discovered in bootloader mode")
 	}
