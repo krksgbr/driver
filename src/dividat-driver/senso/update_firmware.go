@@ -16,7 +16,6 @@ type SendMsg struct {
 	success  func(string)
 }
 
-
 // Disconnect from current connection
 func (handle *Handle) ProcessFirmwareUpdateRequest(command UpdateFirmware, send SendMsg) {
 	handle.log.Info("Processing firmware update request.")
