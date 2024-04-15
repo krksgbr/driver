@@ -148,10 +148,10 @@ func putTFTP(host string, port string, image io.Reader, onProgress OnProgress) e
 	}
 
 	client.SetBackoff(func(attempt int) time.Duration {
-		a1 := attempt + 1
-		msg := fmt.Sprintf("Failed on attempt %d, retrying in %v", a1, expDelay(a1))
+		delay := expDelay(attempt)
+		msg := fmt.Sprintf("Failed on attempt %d, retrying in %v", attempt+1, delay)
 		onProgress(msg)
-		return expDelay(attempt)
+		return delay
 	})
 
 	onProgress("Preparing transmission")
