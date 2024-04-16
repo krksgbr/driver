@@ -14,7 +14,6 @@ import (
 func Command(flags []string) {
 	updateFlags := flag.NewFlagSet("update", flag.ExitOnError)
 	imagePath := updateFlags.String("i", "", "Firmware image path")
-	configuredAddr := updateFlags.String("a", "", "Senso address (optional)")
 	sensoSerial := updateFlags.String("s", "", "Senso serial (optional)")
 	updateFlags.Parse(flags)
 
@@ -34,8 +33,6 @@ func Command(flags []string) {
 
 	if *sensoSerial != "" {
 		err = UpdateBySerial(context.Background(), *sensoSerial, file, onProgress)
-	} else if *configuredAddr != "" {
-		err = updateByAddress(context.Background(), *configuredAddr, file, onProgress)
 	} else {
 		err = updateByDiscovery(context.Background(), file, onProgress)
 	}
@@ -45,19 +42,6 @@ func Command(flags []string) {
 		fmt.Printf("Update failed: %v \n", err)
 		os.Exit(1)
 	}
-}
-
-// The following functions are only used when updating the firmware via the command line.
-// This is why they are private, and not part of the main module.
-
-func updateByAddress(ctx context.Context, address string, image io.Reader, onProgress OnProgress) error {
-	onProgress(fmt.Sprintf("Using specified address %s", address))
-	match := service.Find(ctx, discoveryTimeout, service.AddressFilter(address))
-	if match == nil {
-		return fmt.Errorf("Failed to find Senso with address %s.\n%s", address, tryPowerCycling)
-	}
-
-	return update(ctx, *match, image, onProgress)
 }
 
 func updateByDiscovery(ctx context.Context, image io.Reader, onProgress OnProgress) error {
