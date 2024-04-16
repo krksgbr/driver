@@ -31,29 +31,44 @@ func Command(flags []string) {
 		fmt.Println(progressMsg)
 	}
 
+	tryPowerCycling := "Try turning the Senso off and on, waiting for 30 seconds and then running this update tool again."
+	suggestPowerCycling := false
+
 	if *sensoSerial != "" {
 		err = UpdateBySerial(context.Background(), *sensoSerial, file, onProgress)
+		if err != nil {
+			suggestPowerCycling = true
+		}
 	} else {
-		err = updateByDiscovery(context.Background(), file, onProgress)
+		err, suggestPowerCycling = updateByDiscovery(context.Background(), file, onProgress)
 	}
 
 	if err != nil {
 		fmt.Println()
 		fmt.Printf("Update failed: %v \n", err)
+		if suggestPowerCycling {
+			fmt.Println(tryPowerCycling)
+		}
 		os.Exit(1)
 	}
 }
 
-func updateByDiscovery(ctx context.Context, image io.Reader, onProgress OnProgress) error {
+func updateByDiscovery(ctx context.Context, image io.Reader, onProgress OnProgress) (err error, suggestPowerCycling bool) {
 	onProgress("Discovering Sensos")
 	services := service.List(ctx, discoveryTimeout)
 	if len(services) == 1 {
 		target := services[0]
 		onProgress(fmt.Sprintf("Discovered Senso: %s (%s)", target.Text.Serial, target.Address))
-		return update(ctx, target, image, onProgress)
+		err = update(ctx, target, image, onProgress)
+		if err != nil {
+			suggestPowerCycling = true
+		}
 	} else if len(services) == 0 {
-		return fmt.Errorf("Could not find any Sensos.\n%s", tryPowerCycling)
+		err = fmt.Errorf("Could not find any Sensos.")
+		suggestPowerCycling = true
 	} else {
-		return fmt.Errorf("discovered multiple Sensos: %v, please specify a serial or IP", services)
+		err = fmt.Errorf("discovered multiple Sensos: %v, please specify a serial or IP", services)
+		suggestPowerCycling = false
 	}
+	return
 }

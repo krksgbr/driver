@@ -34,13 +34,11 @@ const discoveryTimeout = 60 * time.Second
 
 type OnProgress func(msg string)
 
-const tryPowerCycling = "Try turning the Senso off and on, waiting for 30 seconds and then running this update tool again."
-
 func UpdateBySerial(ctx context.Context, deviceSerial string, image io.Reader, onProgress OnProgress) error {
 	onProgress(fmt.Sprintf("Looking for Senso with specified serial %s", deviceSerial))
 	match := service.Find(ctx, discoveryTimeout, service.SerialNumberFilter(deviceSerial))
 	if match == nil {
-		return fmt.Errorf("Failed to find Senso with serial number %s.\n%s", deviceSerial, tryPowerCycling)
+		return fmt.Errorf("Failed to find Senso with serial number %s.\n%s", deviceSerial)
 	}
 
 	onProgress(fmt.Sprintf("Discovered Senso at %s", match.Address))
@@ -71,7 +69,7 @@ func update(parentCtx context.Context, target service.Service, image io.Reader, 
 		})
 
 		if dfuService == nil {
-			return fmt.Errorf("Could not rediscover Senso in bootloader mode.\n%s", tryPowerCycling)
+			return fmt.Errorf("Could not rediscover Senso in bootloader mode.")
 		}
 
 		target = *dfuService
