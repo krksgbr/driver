@@ -270,7 +270,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if messageType == websocket.BinaryMessage {
 
 				if handle.firmwareUpdate.IsUpdating() {
-					handle.log.Info("Firmware update in progress, ignoring Senso command.")
+					handle.log.Info("Ignoring Senso command during firmware update.")
 					continue
 				}
 
@@ -287,7 +287,7 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				log.WithField("command", prettyPrintCommand(command)).Debug("Received command.")
 
 				if handle.firmwareUpdate.IsUpdating() && (command.GetStatus == nil || command.Discover == nil) {
-					handle.log.Info("Firmware update in progress, ignoring UpdateFirmware command.")
+					log.WithField("command", prettyPrintCommand(command)).Info("Ignoring command during firmware update.")
 					continue
 				}
 
