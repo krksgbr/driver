@@ -31,6 +31,7 @@ func (handle *Handle) ProcessFirmwareUpdateRequest(command UpdateFirmware, send 
 		msg := fmt.Sprintf("Error decoding base64 string: %v", err)
 		send.failure(msg)
 		handle.log.Error(msg)
+		return
 	}
 
 	err = firmware.UpdateBySerial(context.Background(), command.SerialNumber, image, send.progress)
