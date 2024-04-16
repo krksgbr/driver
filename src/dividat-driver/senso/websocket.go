@@ -38,6 +38,8 @@ func prettyPrintCommand(command Command) string {
 		return "Disconnect"
 	} else if command.Discover != nil {
 		return "Discover"
+	} else if command.UpdateFirmware != nil {
+		return "UpdateFirmware"
 	}
 	return "Unknown"
 }
