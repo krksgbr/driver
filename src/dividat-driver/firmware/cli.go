@@ -51,6 +51,8 @@ func Command(flags []string) {
 		}
 		os.Exit(1)
 	}
+
+	fmt.Println("Success! Firmware transmitted to Senso.")
 }
 
 func updateByDiscovery(ctx context.Context, image io.Reader, onProgress OnProgress) (err error, suggestPowerCycling bool) {

@@ -86,7 +86,6 @@ func update(parentCtx context.Context, target service.Service, image io.Reader, 
 		return err
 	}
 
-	onProgress("Success! Firmware transmitted to Senso.")
 	return nil
 }
 
