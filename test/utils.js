@@ -1,6 +1,5 @@
 const { spawn } = require('child_process')
 const WebSocket = require('ws')
-const rp = require('request-promise')
 
 module.exports = {
   wait: function (t) {
@@ -26,7 +25,13 @@ module.exports = {
   },
 
   getJSON: function (uri) {
-    return rp({uri: uri, json: true})
+    return fetch(uri)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Network response was not OK: ${response.status}`)
+        }
+        return response.json()
+    })
   },
 
   expectEvent: function (emitter, event, filter) {
