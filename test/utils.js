@@ -1,6 +1,5 @@
 const { spawn } = require('child_process')
 const WebSocket = require('ws')
-const Promise = require('bluebird')
 const rp = require('request-promise')
 
 module.exports = {

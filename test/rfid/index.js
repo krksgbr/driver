@@ -1,7 +1,6 @@
 /* eslint-env mocha */
 const { wait, startDriver, connectWS, getJSON, expectEvent } = require('../utils')
 const expect = require('chai').expect
-const Promise = require('bluebird')
 
 // TESTS
 
