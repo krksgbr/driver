@@ -9,12 +9,9 @@
     "replay-flex": "node tools/replay-flex/"
   },
   "dependencies": {
-    "bluebird": "^3.7.2",
     "bonjour": "^3.5.0",
     "chai": "^4.1.1",
-    "mocha": "^5.2.0",
-    "request": "^2.88.0",
-    "request-promise": "^4.2.2",
+    "mocha": "^10.4.0",
     "ws": "^3.1.0"
   },
   "devDependencies": {
