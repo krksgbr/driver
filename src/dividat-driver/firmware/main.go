@@ -38,10 +38,10 @@ func UpdateBySerial(ctx context.Context, deviceSerial string, image io.Reader, o
 	onProgress(fmt.Sprintf("Looking for Senso with specified serial %s", deviceSerial))
 	match := service.Find(ctx, discoveryTimeout, service.SerialNumberFilter(deviceSerial))
 	if match == nil {
-		return fmt.Errorf("Failed to find Senso with serial number %s.\n%s", deviceSerial)
+		return fmt.Errorf("Failed to find Senso with serial number %s", deviceSerial)
 	}
 
-	onProgress(fmt.Sprintf("Discovered Senso at %s", match.Address))
+	onProgress(fmt.Sprintf("Found Senso at %s", match.Address))
 	return update(ctx, *match, image, onProgress)
 }
 
@@ -60,7 +60,7 @@ func update(parentCtx context.Context, target service.Service, image io.Reader, 
 		})
 
 		if err != nil {
-			return fmt.Errorf("could not send DFU command to Senso at %s: %s", target.Address, err)
+			return fmt.Errorf("Could not send DFU command to Senso at %s: %s", target.Address, err)
 		}
 
 		onProgress("Looking for Senso in bootloader mode")
@@ -69,16 +69,16 @@ func update(parentCtx context.Context, target service.Service, image io.Reader, 
 		})
 
 		if dfuService == nil {
-			return fmt.Errorf("Could not rediscover Senso in bootloader mode.")
+			return fmt.Errorf("Could not find Senso in bootloader mode")
 		}
 
 		target = *dfuService
-		onProgress(fmt.Sprintf("Re-discovered Senso in bootloader mode at %s", target.Address))
+		onProgress(fmt.Sprintf("Found Senso in bootloader mode at %s", target.Address))
 		onProgress("Waiting 10 seconds to ensure proper TFTP startup")
 		// Wait to ensure proper TFTP startup
 		time.Sleep(10 * time.Second)
 	} else {
-		onProgress("Senso discovered in bootloader mode")
+		onProgress("Found Senso in bootloader mode")
 	}
 
 	err := putTFTP(target.Address, tftpPort, image, onProgress)
@@ -119,7 +119,7 @@ func sendDfuCommand(host string, port string, onProgress OnProgress) error {
 		return fmt.Errorf("Could not send DFU command: %v", err)
 	}
 
-	onProgress(fmt.Sprintf("Sent DFU command to %s:%s.", host, port))
+	onProgress(fmt.Sprintf("Sent DFU command to %s:%s", host, port))
 
 	return nil
 }

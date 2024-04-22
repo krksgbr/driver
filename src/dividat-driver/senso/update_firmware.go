@@ -40,7 +40,7 @@ func (handle *Handle) ProcessFirmwareUpdateRequest(command UpdateFirmware, send 
 		send.failure(failureMsg)
 		handle.log.Error(failureMsg)
 	} else {
-		send.success("Firmware successfully transmitted.")
+		send.success("Firmware successfully transmitted")
 	}
 	handle.firmwareUpdate.SetUpdating(false)
 }
