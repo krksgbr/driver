@@ -26,7 +26,6 @@ func Start(logger *logrus.Logger, origins []string) context.CancelFunc {
 	// Log Server
 	logServer := logging.NewLogServer()
 	logger.AddHook(logServer)
-	http.Handle("/log", corsHeaders(origins, logServer))
 
 	baseLog := logger.WithFields(logrus.Fields{
 		"version": version,
@@ -46,22 +45,25 @@ func Start(logger *logrus.Logger, origins []string) context.CancelFunc {
 
 	baseLog.Info("Dividat Driver starting")
 
+	// Setup log endpoint
+	http.Handle("/log", originMiddleware(origins, baseLog, logServer))
+
 	// Setup a context
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Setup Senso
 	sensoHandle := senso.New(ctx, baseLog.WithField("package", "senso"))
-	http.Handle("/senso", corsHeaders(origins, sensoHandle))
+	http.Handle("/senso", originMiddleware(origins, baseLog, sensoHandle))
 
 	// Setup SensingTex reader
 	flexHandle := flex.New(ctx, baseLog.WithField("package", "flex"))
-	http.Handle("/flex", corsHeaders(origins, flexHandle))
+	http.Handle("/flex", originMiddleware(origins, baseLog, flexHandle))
 
 	// Setup RFID scanner
 	rfidHandle := rfid.NewHandle(ctx, baseLog.WithField("package", "rfid"))
 	// net/http performs a redirect from `/rfid` if only `/rfid/` is mounted
-	http.Handle("/rfid", corsHeaders(origins, rfidHandle))
-	http.Handle("/rfid/", corsHeaders(origins, rfidHandle))
+	http.Handle("/rfid", originMiddleware(origins, baseLog, rfidHandle))
+	http.Handle("/rfid/", originMiddleware(origins, baseLog, rfidHandle))
 
 	// Create a logger for server
 	log := baseLog.WithField("package", "server")
@@ -80,7 +82,7 @@ func Start(logger *logrus.Logger, origins []string) context.CancelFunc {
 		"os":        systemInfo.Os,
 		"arch":      systemInfo.Arch,
 	})
-	http.Handle("/", corsHeaders(origins, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	http.Handle("/", originMiddleware(origins, baseLog, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(rootMsg)
 	})))
@@ -107,17 +109,34 @@ func Start(logger *logrus.Logger, origins []string) context.CancelFunc {
 	return cancel
 }
 
-// Middleware for CORS headers, to be applied to any route that should be accessible from browser apps.
-func corsHeaders(origins []string, next http.Handler) http.Handler {
+// Middleware to ensure browser requests come from permissible origins.
+//
+// This protects anyone running the driver from malicious websites connecting
+// to the loopback address. In order to protect WebSocket endpoints, for which
+// CORS pre-flight requests are not performed, we fully deny requests from
+// unknown origins instead of just withholding CORS headers.
+func originMiddleware(origins []string, log *logrus.Entry, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if len(r.Header["Origin"]) == 1 && contains(origins, r.Header["Origin"][0]) {
-			w.Header().Set("Access-Control-Allow-Origin", r.Header["Origin"][0])
+		origin := r.Header.Get("Origin")
+
+		// Check whether a request was made from a permissible origin.
+		// An absent Origin header indicates a non-browser request and is permissible.
+		if origin != "" && !contains(origins, origin) {
+			log.WithField("origin", r.Header.Get("Origin")).Info("Denying request from untrusted origin.")
+			w.WriteHeader(403)
+			return
+		}
+
+		// Set CORS/Private Network Access headers
+		if origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Private-Network", "true")
 		}
 
 		// Announce that `Origin` header value may affect response
 		w.Header().Set("Vary", "Origin")
 
+		// Greenlight pre-flight requests, forward all other requests
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(200)
 			return

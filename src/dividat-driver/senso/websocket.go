@@ -323,6 +323,7 @@ var webSocketUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
+		// Check is performed by top-level HTTP middleware, and not repeated here.
 		return true
 	},
 }
