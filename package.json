@@ -15,6 +15,7 @@
     "ws": "^3.1.0"
   },
   "devDependencies": {
-    "binary-split": "^1.0.5"
+    "binary-split": "^1.0.5",
+    "minimist": "^1.2.8"
   }
 }
