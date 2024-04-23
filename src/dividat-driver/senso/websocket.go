@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/grandcat/zeroconf"
+	"github.com/libp2p/zeroconf/v2"
 	"github.com/sirupsen/logrus"
+
+	"github.com/dividat/driver/src/dividat-driver/service"
 )
 
 // WEBSOCKET PROTOCOL
@@ -24,6 +26,7 @@ type Command struct {
 	*Disconnect
 
 	*Discover
+	*UpdateFirmware
 }
 
 func prettyPrintCommand(command Command) string {
@@ -35,6 +38,8 @@ func prettyPrintCommand(command Command) string {
 		return "Disconnect"
 	} else if command.Discover != nil {
 		return "Discover"
+	} else if command.UpdateFirmware != nil {
+		return "UpdateFirmware"
 	}
 	return "Unknown"
 }
@@ -53,6 +58,11 @@ type Disconnect struct{}
 // Discover command
 type Discover struct {
 	Duration int `json:"duration"`
+}
+
+type UpdateFirmware struct {
+	SerialNumber string `json:"serialNumber"`
+	Image        string `json:"image"`
 }
 
 // UnmarshalJSON implements encoding/json Unmarshaler interface
@@ -85,6 +95,11 @@ func (command *Command) UnmarshalJSON(data []byte) error {
 			return err
 		}
 
+	} else if temp.Type == "UpdateFirmware" {
+		err := json.Unmarshal(data, &command.UpdateFirmware)
+		if err != nil {
+			return err
+		}
 	} else {
 		return errors.New("can not decode unknown command")
 	}
@@ -95,13 +110,19 @@ func (command *Command) UnmarshalJSON(data []byte) error {
 // Message that can be sent to Play
 type Message struct {
 	*Status
-
-	Discovered *zeroconf.ServiceEntry
+	Discovered            *zeroconf.ServiceEntry
+	FirmwareUpdateMessage *FirmwareUpdateMessage
 }
 
 // Status is a message containing status information
 type Status struct {
 	Address *string
+}
+
+type FirmwareUpdateMessage struct {
+	FirmwareUpdateProgress *string
+	FirmwareUpdateSuccess  *string
+	FirmwareUpdateFailure  *string
 }
 
 // MarshalJSON ipmlements JSON encoder for messages
@@ -126,6 +147,34 @@ func (message *Message) MarshalJSON() ([]byte, error) {
 			IP:           append(message.Discovered.AddrIPv4, message.Discovered.AddrIPv6...),
 		})
 
+	} else if message.FirmwareUpdateMessage != nil {
+		fwUpdate := struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		}{}
+
+		firmwareUpdateMessage := *message.FirmwareUpdateMessage
+
+		if firmwareUpdateMessage.FirmwareUpdateProgress != nil {
+
+			fwUpdate.Type = "FirmwareUpdateProgress"
+			fwUpdate.Message = *firmwareUpdateMessage.FirmwareUpdateProgress
+
+		} else if firmwareUpdateMessage.FirmwareUpdateFailure != nil {
+
+			fwUpdate.Type = "FirmwareUpdateFailure"
+			fwUpdate.Message = *firmwareUpdateMessage.FirmwareUpdateFailure
+
+		} else if firmwareUpdateMessage.FirmwareUpdateSuccess != nil {
+
+			fwUpdate.Type = "FirmwareUpdateSuccess"
+			fwUpdate.Message = *firmwareUpdateMessage.FirmwareUpdateSuccess
+
+		} else {
+			return nil, errors.New("could not marshal firmware update message")
+		}
+
+		return json.Marshal(fwUpdate)
 	}
 
 	return nil, errors.New("could not marshal message")
@@ -221,6 +270,12 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if messageType == websocket.BinaryMessage {
+
+				if handle.firmwareUpdate.IsUpdating() {
+					handle.log.Debug("Ignoring Senso command during firmware update.")
+					continue
+				}
+
 				handle.broker.TryPub(msg, "tx")
 
 			} else if messageType == websocket.TextMessage {
@@ -232,6 +287,11 @@ func (handle *Handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				log.WithField("command", prettyPrintCommand(command)).Debug("Received command.")
+
+				if handle.firmwareUpdate.IsUpdating() && (command.GetStatus == nil || command.Discover == nil) {
+					log.WithField("command", prettyPrintCommand(command)).Debug("Ignoring command during firmware update.")
+					continue
+				}
 
 				err := handle.dispatchCommand(ctx, log, command, sendMessage)
 				if err != nil {
@@ -273,14 +333,14 @@ func (handle *Handle) dispatchCommand(ctx context.Context, log *logrus.Entry, co
 
 		discoveryCtx, _ := context.WithTimeout(ctx, time.Duration(command.Discover.Duration)*time.Second)
 
-		entries := handle.Discover(discoveryCtx)
+		entries := service.Scan(discoveryCtx)
 
-		go func(entries chan *zeroconf.ServiceEntry) {
+		go func(entries chan service.Service) {
 			for entry := range entries {
 				log.WithField("service", entry).Debug("Discovered service.")
 
 				var message Message
-				message.Discovered = entry
+				message.Discovered = &entry.ServiceEntry
 
 				err := sendMessage(message)
 				if err != nil {
@@ -293,8 +353,36 @@ func (handle *Handle) dispatchCommand(ctx context.Context, log *logrus.Entry, co
 
 		return nil
 
+	} else if command.UpdateFirmware != nil {
+		go handle.ProcessFirmwareUpdateRequest(*command.UpdateFirmware, SendMsg{
+			progress: func(msg string) {
+				sendMessage(firmwareUpdateProgress(msg))
+			},
+			failure: func(msg string) {
+				sendMessage(firmwareUpdateFailure(msg))
+			},
+			success: func(msg string) {
+				sendMessage(firmwareUpdateSuccess(msg))
+			},
+		})
 	}
 	return nil
+}
+
+func firmwareUpdateSuccess(msg string) Message {
+	return firmwareUpdateMessage(FirmwareUpdateMessage{FirmwareUpdateSuccess: &msg})
+}
+
+func firmwareUpdateFailure(msg string) Message {
+	return firmwareUpdateMessage(FirmwareUpdateMessage{FirmwareUpdateFailure: &msg})
+}
+
+func firmwareUpdateProgress(msg string) Message {
+	return firmwareUpdateMessage(FirmwareUpdateMessage{FirmwareUpdateProgress: &msg})
+}
+
+func firmwareUpdateMessage(msg FirmwareUpdateMessage) Message {
+	return Message{FirmwareUpdateMessage: &msg}
 }
 
 // rx_data_loop reads data from Senso and forwards it up the WebSocket

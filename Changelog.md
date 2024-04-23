@@ -7,6 +7,7 @@
 - Deny WebSocket connections from unknown origins
 - Let firmware update command look for bootloader if no Senso in regular mode is found
 - Update build system and development environment
+- Add support for triggering firmware updates via websocket
 
 ## [2.3.0] - 2022-10-01
 

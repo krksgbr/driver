@@ -7,6 +7,8 @@ import (
 
 	"github.com/cskr/pubsub"
 	"github.com/sirupsen/logrus"
+
+	"github.com/dividat/driver/src/dividat-driver/firmware"
 )
 
 // Handle for managing Senso
@@ -20,6 +22,8 @@ type Handle struct {
 	cancelCurrentConnection context.CancelFunc
 	connectionChangeMutex   *sync.Mutex
 
+	firmwareUpdate *firmware.Update
+
 	log *logrus.Entry
 }
 
@@ -32,6 +36,7 @@ func New(ctx context.Context, log *logrus.Entry) *Handle {
 	handle.log = log
 
 	handle.connectionChangeMutex = &sync.Mutex{}
+	handle.firmwareUpdate = firmware.InitialUpdateState()
 
 	// PubSub broker
 	handle.broker = pubsub.New(32)
