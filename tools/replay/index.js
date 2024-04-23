@@ -115,7 +115,7 @@ const dataStream = Replayer(recFile)
 // Advertise Senso via mDNS
 bonjour.publish({
   name: 'Senso data replayer',
-  txt: {ser_no: profile.serial_number},
+  txt: {ser_no: profile.serial_number, mode: 'Application'},
   type: 'sensoControl',
   port: '55567'})
 
