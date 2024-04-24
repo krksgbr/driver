@@ -82,7 +82,7 @@ func scanForType(ctx context.Context, t ServiceType, results chan<- Service, wg 
 					entriesWithoutSerial++
 				}
 				var address string
-				if entry.AddrIPv4[0] != nil {
+				if len(entry.AddrIPv4) > 0 {
 					address = entry.AddrIPv4[0].String()
 				} else {
 					continue
